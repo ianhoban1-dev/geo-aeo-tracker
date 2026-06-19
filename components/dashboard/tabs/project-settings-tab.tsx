@@ -4,6 +4,8 @@ import {
   isCloudAvailable,
   isCloudEnabledByUser,
   setCloudEnabledByUser,
+  getSyncSecret,
+  setSyncSecret,
 } from "@/lib/client/cloud-mode";
 
 type ProjectSettingsTabProps = {
@@ -12,15 +14,21 @@ type ProjectSettingsTabProps = {
   onReset?: () => void;
 };
 
-export function ProjectSettingsTab({ brand, onBrandChange, onReset }: ProjectSettingsTabProps) {
+export function ProjectSettingsTab({
+  brand,
+  onBrandChange,
+  onReset,
+}: ProjectSettingsTabProps) {
   return (
     <div className="space-y-5">
       <div>
-        <div className="mb-3 text-base font-semibold text-th-text">Brand & Website</div>
+        <div className="mb-3 text-base font-semibold text-th-text">
+          Brand & Website
+        </div>
         <p className="mb-4 text-sm leading-relaxed text-th-text-muted">
-          Configure your brand so every prompt, audit, and analysis is contextualized
-          for your website. Data is stored locally in your browser — or in Supabase
-          if cloud sync is enabled below.
+          Configure your brand so every prompt, audit, and analysis is
+          contextualized for your website. Data is stored locally in your
+          browser — or in Supabase if cloud sync is enabled below.
         </p>
       </div>
 
@@ -71,18 +79,15 @@ export function ProjectSettingsTab({ brand, onBrandChange, onReset }: ProjectSet
 
       {/* Quick status */}
       <div className="grid gap-2 sm:grid-cols-3">
-        <StatusChip
-          label="Brand Name"
-          ok={brand.brandName.trim().length > 0}
-        />
+        <StatusChip label="Brand Name" ok={brand.brandName.trim().length > 0} />
         <StatusChip
           label="Website"
-          ok={brand.websites.length > 0 && brand.websites.some((w) => w.trim().length > 0)}
+          ok={
+            brand.websites.length > 0 &&
+            brand.websites.some((w) => w.trim().length > 0)
+          }
         />
-        <StatusChip
-          label="Keywords"
-          ok={brand.keywords.trim().length > 0}
-        />
+        <StatusChip label="Keywords" ok={brand.keywords.trim().length > 0} />
       </div>
 
       <CloudSyncCard />
@@ -90,8 +95,13 @@ export function ProjectSettingsTab({ brand, onBrandChange, onReset }: ProjectSet
       {/* Danger zone */}
       {onReset && (
         <div className="rounded-lg border border-th-danger/30 bg-th-danger-soft p-4">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-th-danger">Danger Zone</div>
-          <p className="mb-3 text-sm text-th-danger/70">Delete all saved data including runs, prompts, settings, and audit results. This cannot be undone.</p>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-th-danger">
+            Danger Zone
+          </div>
+          <p className="mb-3 text-sm text-th-danger/70">
+            Delete all saved data including runs, prompts, settings, and audit
+            results. This cannot be undone.
+          </p>
           <button
             onClick={onReset}
             className="rounded-lg border border-th-danger/40 bg-th-danger-soft px-4 py-2 text-sm font-medium text-th-danger hover:bg-th-danger/20"
@@ -124,19 +134,28 @@ function CloudSyncCard() {
     () => isCloudAvailable(),
     () => false,
   );
+  const [secret, setSecret] = useState(getSyncSecret);
 
   if (!available) {
     return (
-      <div className="rounded-lg border border-th-border bg-th-surface p-4">
+      <div className="rounded-lg border border-th-border bg-th-card p-4">
         <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-th-text-muted">
           Cloud Sync
         </div>
         <p className="text-sm leading-relaxed text-th-text-muted">
           Cloud storage is not configured on this deployment. Your data is saved
           locally in your browser (IndexedDB). To enable cloud sync, set{" "}
-          <code className="rounded bg-th-surface-muted px-1 py-0.5 text-xs">SUPABASE_URL</code>,{" "}
-          <code className="rounded bg-th-surface-muted px-1 py-0.5 text-xs">SUPABASE_SERVICE_ROLE_KEY</code>, and{" "}
-          <code className="rounded bg-th-surface-muted px-1 py-0.5 text-xs">NEXT_PUBLIC_CLOUD_STORAGE_ENABLED=true</code>{" "}
+          <code className="rounded bg-th-card-alt px-1 py-0.5 text-xs">
+            SUPABASE_URL
+          </code>
+          ,{" "}
+          <code className="rounded bg-th-card-alt px-1 py-0.5 text-xs">
+            SUPABASE_SERVICE_ROLE_KEY
+          </code>
+          , and{" "}
+          <code className="rounded bg-th-card-alt px-1 py-0.5 text-xs">
+            NEXT_PUBLIC_CLOUD_STORAGE_ENABLED=true
+          </code>{" "}
           in your deployment environment. See the README for setup instructions.
         </p>
       </div>
@@ -151,7 +170,7 @@ function CloudSyncCard() {
   }
 
   return (
-    <div className="rounded-lg border border-th-border bg-th-surface p-4">
+    <div className="rounded-lg border border-th-border bg-th-card p-4">
       <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-th-text-muted">
         Cloud Sync
       </div>
@@ -162,7 +181,7 @@ function CloudSyncCard() {
       </p>
       <button
         onClick={toggle}
-        className="rounded-lg border border-th-border bg-th-surface-muted px-4 py-2 text-sm font-medium text-th-text hover:bg-th-surface"
+        className="rounded-lg border border-th-border bg-th-card-alt px-4 py-2 text-sm font-medium text-th-text hover:bg-th-card"
       >
         {enabled ? "Disable cloud sync (local-only)" : "Enable cloud sync"}
       </button>
@@ -170,6 +189,32 @@ function CloudSyncCard() {
         Toggling will reload the page. Existing local data is preserved when
         switching modes but may not automatically sync to the other store.
       </p>
+      {enabled && (
+        <div className="mt-4 border-t border-th-border pt-3">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-th-text-muted">
+            Sync passphrase
+          </label>
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => {
+              setSecret(e.target.value);
+              setSyncSecret(e.target.value);
+            }}
+            placeholder="Matches STATE_SYNC_SECRET"
+            autoComplete="off"
+            className="bd-input w-full rounded-lg p-2.5 text-sm"
+          />
+          <p className="mt-1 text-xs text-th-text-muted">
+            Must equal the{" "}
+            <code className="rounded bg-th-card-alt px-1 py-0.5 text-xs">
+              STATE_SYNC_SECRET
+            </code>{" "}
+            set on your deployment. Without it the cloud sync API rejects every
+            request. Stored only in this browser.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -218,7 +263,12 @@ function WebsiteListField({
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl(); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addUrl();
+            }
+          }}
           placeholder="https://acme.com"
           className="bd-input flex-1 rounded-lg p-2.5 text-sm"
         />
@@ -267,7 +317,9 @@ function StatusChip({ label, ok }: { label: string; ok: boolean }) {
         className={`inline-block h-2.5 w-2.5 rounded-full ${ok ? "bg-th-success" : "bg-th-text-muted"}`}
       />
       <span className="text-sm text-th-text-secondary">{label}</span>
-      <span className={`ml-auto text-xs font-medium ${ok ? "text-th-success" : "text-th-text-muted"}`}>
+      <span
+        className={`ml-auto text-xs font-medium ${ok ? "text-th-success" : "text-th-text-muted"}`}
+      >
         {ok ? "Set" : "Missing"}
       </span>
     </div>

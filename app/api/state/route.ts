@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { isCloudStorageConfigured } from "@/lib/server/supabase";
 import { kvGet, kvSet, kvDelete } from "@/lib/server/kv-store";
@@ -21,13 +22,45 @@ function notConfigured() {
   );
 }
 
+/**
+ * The KV store is backed by the Supabase service-role key (bypasses RLS), so
+ * the route MUST authenticate every request or it becomes an open read/write/
+ * delete proxy to all stored data. We require a shared secret: the deployer
+ * sets STATE_SYNC_SECRET in the environment and enters the same value in the
+ * app's Cloud Sync card, which sends it as `x-sync-secret`.
+ */
+function checkAuth(req: NextRequest): NextResponse | null {
+  const expected = process.env.STATE_SYNC_SECRET;
+  if (!expected) {
+    return NextResponse.json(
+      {
+        error:
+          "Cloud sync requires STATE_SYNC_SECRET to be set on this deployment.",
+      },
+      { status: 503 },
+    );
+  }
+  const provided = req.headers.get("x-sync-secret") ?? "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   if (!isCloudStorageConfigured()) return notConfigured();
+  const unauthorized = checkAuth(req);
+  if (unauthorized) return unauthorized;
 
   const key = req.nextUrl.searchParams.get("key");
   const parsed = keySchema.safeParse(key);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Missing or invalid `key` param." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing or invalid `key` param." },
+      { status: 400 },
+    );
   }
 
   const res = await kvGet(parsed.data);
@@ -37,6 +70,8 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   if (!isCloudStorageConfigured()) return notConfigured();
+  const unauthorized = checkAuth(req);
+  if (unauthorized) return unauthorized;
 
   let body: unknown;
   try {
@@ -47,7 +82,10 @@ export async function PUT(req: NextRequest) {
 
   const parsed = putBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid body: expected {key, value}." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid body: expected {key, value}." },
+      { status: 400 },
+    );
   }
 
   const res = await kvSet(parsed.data.key, parsed.data.value);
@@ -57,11 +95,16 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   if (!isCloudStorageConfigured()) return notConfigured();
+  const unauthorized = checkAuth(req);
+  if (unauthorized) return unauthorized;
 
   const key = req.nextUrl.searchParams.get("key");
   const parsed = keySchema.safeParse(key);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Missing or invalid `key` param." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing or invalid `key` param." },
+      { status: 400 },
+    );
   }
 
   const res = await kvDelete(parsed.data);

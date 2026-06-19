@@ -1,7 +1,12 @@
 "use client";
 
 import { get, set } from "idb-keyval";
-import { isCloudActive } from "./cloud-mode";
+import { isCloudActive, getSyncSecret } from "./cloud-mode";
+
+/** Header that authenticates the client to the /api/state proxy. */
+function syncHeaders(extra?: Record<string, string>): Record<string, string> {
+  return { "x-sync-secret": getSyncSecret(), ...extra };
+}
 
 /**
  * Storage abstraction for the geo-aeo-tracker app.
@@ -19,6 +24,7 @@ async function cloudGet<T>(key: string): Promise<T | null> {
   const res = await fetch(`/api/state?key=${encodeURIComponent(key)}`, {
     method: "GET",
     cache: "no-store",
+    headers: syncHeaders(),
   });
   if (!res.ok) throw new Error(`cloud GET failed: ${res.status}`);
   const data = (await res.json()) as { value: T | null };
@@ -28,7 +34,7 @@ async function cloudGet<T>(key: string): Promise<T | null> {
 async function cloudPut<T>(key: string, value: T): Promise<void> {
   const res = await fetch(`/api/state`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: syncHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ key, value }),
   });
   if (!res.ok) throw new Error(`cloud PUT failed: ${res.status}`);
@@ -37,6 +43,7 @@ async function cloudPut<T>(key: string, value: T): Promise<void> {
 async function cloudDelete(key: string): Promise<void> {
   const res = await fetch(`/api/state?key=${encodeURIComponent(key)}`, {
     method: "DELETE",
+    headers: syncHeaders(),
   });
   if (!res.ok && res.status !== 404) {
     throw new Error(`cloud DELETE failed: ${res.status}`);
@@ -50,7 +57,10 @@ async function cloudDelete(key: string): Promise<void> {
  *   keeps working offline / during Supabase free-tier cold-starts.
  * Local mode: IDB first, localStorage second, fallback third.
  */
-export async function loadSovereignValue<T>(key: string, fallback: T): Promise<T> {
+export async function loadSovereignValue<T>(
+  key: string,
+  fallback: T,
+): Promise<T> {
   if (isCloudActive()) {
     try {
       const cloudValue = await cloudGet<T>(key);
@@ -62,14 +72,19 @@ export async function loadSovereignValue<T>(key: string, fallback: T): Promise<T
     } catch (err) {
       // Network / server error — fall through to local cache
       if (typeof console !== "undefined") {
-        console.warn("[sovereign-store] cloud load failed, using local cache:", err);
+        console.warn(
+          "[sovereign-store] cloud load failed, using local cache:",
+          err,
+        );
       }
     }
     // Cloud returned no value OR failed — try IDB as cache
     try {
       const cached = await get<T>(key);
       if (cached !== undefined) return cached;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return fallback;
   }
 
@@ -88,7 +103,9 @@ export async function loadSovereignValue<T>(key: string, fallback: T): Promise<T
     try {
       const localRaw = window.localStorage.getItem(key);
       if (localRaw) return JSON.parse(localRaw) as T;
-    } catch { /* give up */ }
+    } catch {
+      /* give up */
+    }
   }
 
   return fallback;
@@ -101,7 +118,10 @@ export async function loadSovereignValue<T>(key: string, fallback: T): Promise<T
  *   cache for offline / fast reloads.
  * Local mode: IDB primary, localStorage best-effort cache.
  */
-export async function saveSovereignValue<T>(key: string, value: T): Promise<void> {
+export async function saveSovereignValue<T>(
+  key: string,
+  value: T,
+): Promise<void> {
   if (isCloudActive()) {
     // Cloud is source of truth — await it so errors surface to the caller.
     await cloudPut(key, value);
@@ -117,13 +137,21 @@ export async function saveSovereignValue<T>(key: string, value: T): Promise<void
     const serialized = JSON.stringify(value);
     window.localStorage.setItem(key, serialized);
   } catch {
-    try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 export async function clearSovereignStore(key: string): Promise<void> {
   // Always clear local caches
-  try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
   const { del } = await import("idb-keyval");
   await del(key).catch(() => {});
 

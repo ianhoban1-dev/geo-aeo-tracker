@@ -13,6 +13,33 @@
  */
 
 const CLOUD_PREF_KEY = "sovereign-cloud-sync";
+const SYNC_SECRET_KEY = "sovereign-sync-secret";
+
+/**
+ * The shared secret used to authenticate against /api/state. The deployer sets
+ * STATE_SYNC_SECRET in the environment and the user enters the same value once
+ * in the Cloud Sync card; it is stored per-browser and never ships in the
+ * bundle. Returns "" when unset so callers can send an (invalid) empty header.
+ */
+export function getSyncSecret(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(SYNC_SECRET_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setSyncSecret(secret: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const trimmed = secret.trim();
+    if (trimmed) window.localStorage.setItem(SYNC_SECRET_KEY, trimmed);
+    else window.localStorage.removeItem(SYNC_SECRET_KEY);
+  } catch {
+    /* ignore quota errors */
+  }
+}
 
 export function isCloudAvailable(): boolean {
   // NEXT_PUBLIC_ vars are inlined at build time

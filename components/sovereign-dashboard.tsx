@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { loadSovereignValue, saveSovereignValue, clearSovereignStore } from "@/lib/client/sovereign-store";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  loadSovereignValue,
+  saveSovereignValue,
+  clearSovereignStore,
+} from "@/lib/client/sovereign-store";
 import { DEMO_STATE } from "@/lib/demo-data";
 import { AeoAuditTab } from "@/components/dashboard/tabs/aeo-audit-tab";
 import { AutomationTab } from "@/components/dashboard/tabs/automation-tab-v2";
@@ -16,8 +27,24 @@ import { ReputationSourcesTab } from "@/components/dashboard/tabs/reputation-sou
 import { VisibilityAnalyticsTab } from "@/components/dashboard/tabs/visibility-analytics-tab";
 import { DocumentationTab } from "@/components/dashboard/tabs/documentation-tab";
 import { SROAnalysisTab } from "@/components/dashboard/tabs/sro-analysis-tab";
-import type { AppState, Battlecard, DriftAlert, Provider, RunDelta, ScheduleInterval, ScrapeRun, TabKey, TaggedPrompt, Workspace } from "@/components/dashboard/types";
-import { ALL_PROVIDERS, PROVIDER_LABELS, SCHEDULE_OPTIONS, tabs } from "@/components/dashboard/types";
+import type {
+  AppState,
+  Battlecard,
+  DriftAlert,
+  Provider,
+  RunDelta,
+  ScheduleInterval,
+  ScrapeRun,
+  TabKey,
+  TaggedPrompt,
+  Workspace,
+} from "@/components/dashboard/types";
+import {
+  ALL_PROVIDERS,
+  PROVIDER_LABELS,
+  SCHEDULE_OPTIONS,
+  tabs,
+} from "@/components/dashboard/types";
 
 /* ── Inline SVG icon helpers (16×16) ─────────────────────────────── */
 function Icon({ children }: { children: ReactNode }) {
@@ -152,8 +179,14 @@ const defaultState: AppState = {
   prompt:
     "What is the strongest value proposition for sovereign AI analytics tools in 2026? Include sources.",
   customPrompts: [
-    { text: "How visible is {brand} versus competitors for enterprise AI analytics tools? Include sources.", tags: [] },
-    { text: "What are the top 3 reasons to choose {brand} based on trusted sources?", tags: [] },
+    {
+      text: "How visible is {brand} versus competitors for enterprise AI analytics tools? Include sources.",
+      tags: [],
+    },
+    {
+      text: "What are the top 3 reasons to choose {brand} based on trusted sources?",
+      tags: [],
+    },
   ],
   personas: "CMO\nSEO Lead\nProduct Marketing Manager\nFounder",
   fanoutPrompts: [],
@@ -177,7 +210,10 @@ const defaultState: AppState = {
   driftAlerts: [],
 };
 
-const tabMeta: Record<TabKey, { title: string; tooltip: string; details: string }> = {
+const tabMeta: Record<
+  TabKey,
+  { title: string; tooltip: string; details: string }
+> = {
   "Project Settings": {
     title: "Project Settings",
     tooltip: "Set your brand, site, keywords, and context.",
@@ -258,17 +294,29 @@ const tabMeta: Record<TabKey, { title: string; tooltip: string; details: string 
   },
 };
 
-export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } = {}) {
+export function SovereignDashboard({
+  demoMode = false,
+}: { demoMode?: boolean } = {}) {
   const [activeTab, setActiveTab] = useState<TabKey>("Prompt Hub");
-  const [state, setState] = useState<AppState>(demoMode ? DEMO_STATE : defaultState);
+  const [state, setState] = useState<AppState>(
+    demoMode ? DEMO_STATE : defaultState,
+  );
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(demoMode ? "Demo mode — read-only preview" : "");
+  const [message, setMessage] = useState(
+    demoMode ? "Demo mode — read-only preview" : "",
+  );
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWsId, setActiveWsId] = useState<string>("default");
   const [showWsPicker, setShowWsPicker] = useState(false);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  /**
+   * False until the active workspace's state has finished loading from
+   * IDB/cloud. Guards the save effect so the initial `defaultState` never
+   * overwrites stored data during the async load (a data-loss race).
+   */
+  const hydratedRef = useRef(false);
 
   /** Apply theme class to <html> */
   const applyTheme = useCallback((t: "light" | "dark" | "system") => {
@@ -298,7 +346,11 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   /** Load workspaces on mount */
   useEffect(() => {
     // Theme
-    const savedTheme = localStorage.getItem(THEME_KEY) as "light" | "dark" | "system" | null;
+    const savedTheme = localStorage.getItem(THEME_KEY) as
+      | "light"
+      | "dark"
+      | "system"
+      | null;
     if (savedTheme) {
       setTheme(savedTheme);
       applyTheme(savedTheme);
@@ -312,7 +364,11 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       const parsed: Workspace[] = raw ? JSON.parse(raw) : [];
       if (parsed.length === 0) {
         // Create default workspace
-        const defaultWs: Workspace = { id: "default", brandName: "Default", createdAt: new Date().toISOString() };
+        const defaultWs: Workspace = {
+          id: "default",
+          brandName: "Default",
+          createdAt: new Date().toISOString(),
+        };
         parsed.push(defaultWs);
         localStorage.setItem(WORKSPACES_KEY, JSON.stringify(parsed));
       }
@@ -320,7 +376,11 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       const savedActiveId = localStorage.getItem(ACTIVE_WS_KEY) ?? parsed[0].id;
       setActiveWsId(savedActiveId);
     } catch {
-      const defaultWs: Workspace = { id: "default", brandName: "Default", createdAt: new Date().toISOString() };
+      const defaultWs: Workspace = {
+        id: "default",
+        brandName: "Default",
+        createdAt: new Date().toISOString(),
+      };
       setWorkspaces([defaultWs]);
       setActiveWsId("default");
     }
@@ -330,6 +390,8 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   useEffect(() => {
     if (demoMode || !activeWsId) return;
     let mounted = true;
+    // New workspace target — block saves until this load resolves.
+    hydratedRef.current = false;
     const key = storageKeyForWorkspace(activeWsId);
     loadSovereignValue<AppState>(key, defaultState).then((data) => {
       if (mounted) {
@@ -349,7 +411,11 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
         };
         // Migrate legacy single website → websites array
         const brandAny = data.brand as Record<string, unknown> | undefined;
-        if (brandAny && typeof brandAny.website === "string" && !Array.isArray(brandAny.websites)) {
+        if (
+          brandAny &&
+          typeof brandAny.website === "string" &&
+          !Array.isArray(brandAny.websites)
+        ) {
           merged.brand.websites = brandAny.website ? [brandAny.website] : [];
         }
         // Migrate legacy comma-separated competitors string → Competitor[]
@@ -363,34 +429,44 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
             : [];
         }
         // Migrate legacy plain-string customPrompts → TaggedPrompt[]
-        if (Array.isArray(merged.customPrompts) && merged.customPrompts.length > 0 && typeof merged.customPrompts[0] === "string") {
-          merged.customPrompts = (merged.customPrompts as unknown as string[]).map((t) => ({ text: t, tags: [] }));
+        if (
+          Array.isArray(merged.customPrompts) &&
+          merged.customPrompts.length > 0 &&
+          typeof merged.customPrompts[0] === "string"
+        ) {
+          merged.customPrompts = (
+            merged.customPrompts as unknown as string[]
+          ).map((t) => ({ text: t, tags: [] }));
         }
         if (merged.activeProviders.length === 0) {
           merged.activeProviders = [merged.provider];
         }
         setState(merged);
+        // Load complete — saves for this workspace are now safe.
+        hydratedRef.current = true;
       }
     });
     return () => {
       mounted = false;
     };
-  }, [activeWsId]);
+  }, [activeWsId, demoMode]);
 
   useEffect(() => {
-    if (demoMode || !activeWsId) return;
+    if (demoMode || !activeWsId || !hydratedRef.current) return;
     saveSovereignValue(storageKeyForWorkspace(activeWsId), state);
     // Update workspace brandName if changed
     if (state.brand.brandName) {
       setWorkspaces((prev) => {
         const updated = prev.map((ws) =>
-          ws.id === activeWsId ? { ...ws, brandName: state.brand.brandName || ws.brandName } : ws,
+          ws.id === activeWsId
+            ? { ...ws, brandName: state.brand.brandName || ws.brandName }
+            : ws,
         );
         localStorage.setItem(WORKSPACES_KEY, JSON.stringify(updated));
         return updated;
       });
     }
-  }, [state, activeWsId]);
+  }, [state, activeWsId, demoMode]);
 
   /** ref to the scheduler interval so we can clear/re-create it */
   const schedulerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -401,13 +477,18 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   busyRef.current = busy;
 
   /** ref to latest callScrapeOne so the scheduler callback doesn't use stale brand terms */
-  const callScrapeOneRef = useRef<(prompt: string, provider: Provider) => Promise<ScrapeRun | null>>(
+  const callScrapeOneRef = useRef<
+    (prompt: string, provider: Provider) => Promise<ScrapeRun | null>
+  >(
     // placeholder — will be assigned after callScrapeOne is defined
     async () => null,
   );
 
   /** Detect drift after a batch of new runs */
-  function detectDrift(newRuns: ScrapeRun[], existingRuns: ScrapeRun[]): DriftAlert[] {
+  function detectDrift(
+    newRuns: ScrapeRun[],
+    existingRuns: ScrapeRun[],
+  ): DriftAlert[] {
     const alerts: DriftAlert[] = [];
     const DRIFT_THRESHOLD = 10; // minimum score change to trigger alert
 
@@ -439,7 +520,10 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   const runScheduledBatch = useCallback(async () => {
     const s = stateRef.current;
     if (busyRef.current) return; // skip if already running
-    const prompts = s.customPrompts.length > 0 ? s.customPrompts.map((p) => p.text) : [s.prompt];
+    const prompts =
+      s.customPrompts.length > 0
+        ? s.customPrompts.map((p) => p.text)
+        : [s.prompt];
     const providers = s.activeProviders;
     if (prompts.length === 0 || providers.length === 0) return;
 
@@ -480,7 +564,10 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       schedulerRef.current = null;
     }
     if (!demoMode && state.scheduleEnabled && state.scheduleIntervalMs > 0) {
-      schedulerRef.current = setInterval(runScheduledBatch, state.scheduleIntervalMs);
+      schedulerRef.current = setInterval(
+        runScheduledBatch,
+        state.scheduleIntervalMs,
+      );
     }
     return () => {
       if (schedulerRef.current) {
@@ -507,24 +594,39 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   }
 
   function switchWorkspace(wsId: string) {
-    if (demoMode) { setMessage("Demo mode — workspaces are read-only"); return; }
+    if (demoMode) {
+      setMessage("Demo mode — workspaces are read-only");
+      return;
+    }
     // Save current state first
     saveSovereignValue(storageKeyForWorkspace(activeWsId), state);
     setActiveWsId(wsId);
     localStorage.setItem(ACTIVE_WS_KEY, wsId);
     setShowWsPicker(false);
-    setMessage(`Switched to ${workspaces.find((w) => w.id === wsId)?.brandName ?? "workspace"}`);
+    setMessage(
+      `Switched to ${workspaces.find((w) => w.id === wsId)?.brandName ?? "workspace"}`,
+    );
   }
 
   function createWorkspace(name: string) {
-    if (demoMode) { setMessage("Demo mode — workspaces are read-only"); return; }
-    const ws: Workspace = { id: generateId(), brandName: name, createdAt: new Date().toISOString() };
+    if (demoMode) {
+      setMessage("Demo mode — workspaces are read-only");
+      return;
+    }
+    const ws: Workspace = {
+      id: generateId(),
+      brandName: name,
+      createdAt: new Date().toISOString(),
+    };
     const updated = [...workspaces, ws];
     setWorkspaces(updated);
     localStorage.setItem(WORKSPACES_KEY, JSON.stringify(updated));
     // Save current, switch to new
     saveSovereignValue(storageKeyForWorkspace(activeWsId), state);
-    setState({ ...defaultState, brand: { ...defaultState.brand, brandName: name } });
+    setState({
+      ...defaultState,
+      brand: { ...defaultState.brand, brandName: name },
+    });
     setActiveWsId(ws.id);
     localStorage.setItem(ACTIVE_WS_KEY, ws.id);
     setShowWsPicker(false);
@@ -532,7 +634,10 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   }
 
   function deleteWorkspace(wsId: string) {
-    if (demoMode) { setMessage("Demo mode — workspaces are read-only"); return; }
+    if (demoMode) {
+      setMessage("Demo mode — workspaces are read-only");
+      return;
+    }
     if (workspaces.length <= 1) return;
     if (!window.confirm("Delete this workspace and all its data?")) return;
     const updated = workspaces.filter((w) => w.id !== wsId);
@@ -547,19 +652,34 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   const partnerLeaderboard = useMemo(() => {
     // Client-side junk URL filter as safety net
     const junkHosts = [
-      "cloudfront.net", "cdn.prod.website-files.com", "cdn.jsdelivr.net",
-      "cdnjs.cloudflare.com", "unpkg.com", "fastly.net", "akamaihd.net",
-      "connect.facebook.net", "facebook.net", "google-analytics.com",
-      "googletagmanager.com", "doubleclick.net", "w3.org", "schema.org",
-      "amazonaws.com", "cloudflare.com", "hotjar.com", "sentry.io",
+      "cloudfront.net",
+      "cdn.prod.website-files.com",
+      "cdn.jsdelivr.net",
+      "cdnjs.cloudflare.com",
+      "unpkg.com",
+      "fastly.net",
+      "akamaihd.net",
+      "connect.facebook.net",
+      "facebook.net",
+      "google-analytics.com",
+      "googletagmanager.com",
+      "doubleclick.net",
+      "w3.org",
+      "schema.org",
+      "amazonaws.com",
+      "cloudflare.com",
+      "hotjar.com",
+      "sentry.io",
     ];
-    const junkExtPattern = /\.(png|jpe?g|gif|svg|webp|avif|ico|css|js|woff2?|ttf|eot|mp4|webm)(\?|$)/i;
+    const junkExtPattern =
+      /\.(png|jpe?g|gif|svg|webp|avif|ico|css|js|woff2?|ttf|eot|mp4|webm)(\?|$)/i;
 
     function isCleanUrl(url: string): boolean {
       try {
         const parsed = new URL(url);
         const host = parsed.hostname.toLowerCase();
-        if (junkHosts.some((j) => host === j || host.endsWith(`.${j}`))) return false;
+        if (junkHosts.some((j) => host === j || host.endsWith(`.${j}`)))
+          return false;
         if (junkExtPattern.test(parsed.pathname)) return false;
         if (parsed.search.length > 200) return false;
         return true;
@@ -571,7 +691,10 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
     const map = new Map<string, { count: number; prompts: Set<string> }>();
     state.runs.forEach((run) => {
       run.sources.filter(isCleanUrl).forEach((source) => {
-        const existing = map.get(source) ?? { count: 0, prompts: new Set<string>() };
+        const existing = map.get(source) ?? {
+          count: 0,
+          prompts: new Set<string>(),
+        };
         existing.count += 1;
         existing.prompts.add(run.prompt);
         map.set(source, existing);
@@ -579,7 +702,11 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
     });
 
     return [...map.entries()]
-      .map(([url, data]) => ({ url, count: data.count, prompts: [...data.prompts] }))
+      .map(([url, data]) => ({
+        url,
+        count: data.count,
+        prompts: [...data.prompts],
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 50);
   }, [state.runs]);
@@ -612,13 +739,21 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   const citationOpportunities = useMemo(() => {
     const domains = new Set<string>();
     state.runs
-      .filter((r) => r.sentiment === "not-mentioned" || (r.brandMentions?.length ?? 0) === 0)
+      .filter(
+        (r) =>
+          r.sentiment === "not-mentioned" ||
+          (r.brandMentions?.length ?? 0) === 0,
+      )
       .forEach((r) => {
         r.sources.forEach((url) => {
           try {
-            const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+            const host = new URL(url).hostname
+              .replace(/^www\./, "")
+              .toLowerCase();
             domains.add(host);
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         });
       });
     return domains.size;
@@ -640,7 +775,8 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
     grouped.forEach((runs) => {
       // Sort newest first
       const sorted = [...runs].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
       if (sorted.length < 2) return;
       const curr = sorted[0];
@@ -669,14 +805,19 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   const kpiVisibilityDelta = useMemo(() => {
     if (state.runs.length < 2) return null;
     const sorted = [...state.runs].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     const mid = Math.floor(sorted.length / 2);
     const recentHalf = sorted.slice(0, mid);
     const olderHalf = sorted.slice(mid);
     if (recentHalf.length === 0 || olderHalf.length === 0) return null;
-    const recentAvg = recentHalf.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) / recentHalf.length;
-    const olderAvg = olderHalf.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) / olderHalf.length;
+    const recentAvg =
+      recentHalf.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) /
+      recentHalf.length;
+    const olderAvg =
+      olderHalf.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) /
+      olderHalf.length;
     return Math.round(recentAvg - olderAvg);
   }, [state.runs]);
 
@@ -705,7 +846,9 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   }
 
   function getCompetitorTerms(): string[] {
-    return state.competitors.flatMap((c) => [c.name, ...c.aliases]).filter(Boolean);
+    return state.competitors
+      .flatMap((c) => [c.name, ...c.aliases])
+      .filter(Boolean);
   }
 
   /** Find which terms appear in text (case-insensitive) */
@@ -725,20 +868,52 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
     if (!mentioned) return "not-mentioned";
 
     const positiveWords = [
-      "best", "leading", "top", "excellent", "recommend", "great", "outstanding",
-      "innovative", "trusted", "powerful", "superior", "preferred", "popular",
-      "reliable", "impressive", "standout", "strong", "ideal",
+      "best",
+      "leading",
+      "top",
+      "excellent",
+      "recommend",
+      "great",
+      "outstanding",
+      "innovative",
+      "trusted",
+      "powerful",
+      "superior",
+      "preferred",
+      "popular",
+      "reliable",
+      "impressive",
+      "standout",
+      "strong",
+      "ideal",
     ];
     const negativeWords = [
-      "worst", "poor", "bad", "avoid", "lacking", "weak", "inferior",
-      "disappointing", "overpriced", "limited", "outdated", "risky",
-      "problematic", "concern", "drawback", "downside",
+      "worst",
+      "poor",
+      "bad",
+      "avoid",
+      "lacking",
+      "weak",
+      "inferior",
+      "disappointing",
+      "overpriced",
+      "limited",
+      "outdated",
+      "risky",
+      "problematic",
+      "concern",
+      "drawback",
+      "downside",
     ];
 
     let posScore = 0;
     let negScore = 0;
-    positiveWords.forEach((w) => { if (lower.includes(w)) posScore++; });
-    negativeWords.forEach((w) => { if (lower.includes(w)) negScore++; });
+    positiveWords.forEach((w) => {
+      if (lower.includes(w)) posScore++;
+    });
+    negativeWords.forEach((w) => {
+      if (lower.includes(w)) negScore++;
+    });
 
     if (posScore > negScore + 1) return "positive";
     if (negScore > posScore + 1) return "negative";
@@ -774,12 +949,20 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
 
     // Brand website in sources? +20
     const websiteDomains = state.brand.websites
-      .map((w) => w.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase())
+      .map((w) =>
+        w
+          .replace(/^https?:\/\//, "")
+          .replace(/\/.*$/, "")
+          .toLowerCase(),
+      )
       .filter(Boolean);
-    if (websiteDomains.length > 0 && sources.some((s) => {
-      const sl = s.toLowerCase();
-      return websiteDomains.some((d) => sl.includes(d));
-    })) {
+    if (
+      websiteDomains.length > 0 &&
+      sources.some((s) => {
+        const sl = s.toLowerCase();
+        return websiteDomains.some((d) => sl.includes(d));
+      })
+    ) {
       score += 20;
     }
 
@@ -792,8 +975,14 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
   }
 
   /** Run a single scrape against one specific provider */
-  async function callScrapeOne(prompt: string, provider: Provider): Promise<ScrapeRun | null> {
-    if (demoMode) { setMessage("Demo mode — API calls are disabled"); return null; }
+  async function callScrapeOne(
+    prompt: string,
+    provider: Provider,
+  ): Promise<ScrapeRun | null> {
+    if (demoMode) {
+      setMessage("Demo mode — API calls are disabled");
+      return null;
+    }
     try {
       const response = await fetch("/api/scrape", {
         method: "POST",
@@ -819,7 +1008,11 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
         answer: answerText,
         sources: sourceList,
         createdAt: data.createdAt || new Date().toISOString(),
-        visibilityScore: calcVisibilityScore(answerText, sourceList, brandTerms),
+        visibilityScore: calcVisibilityScore(
+          answerText,
+          sourceList,
+          brandTerms,
+        ),
         sentiment: detectSentiment(answerText, brandTerms),
         brandMentions: findMentions(answerText, brandTerms),
         competitorMentions: findMentions(answerText, competitorTerms),
@@ -834,9 +1027,10 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
 
   /** Run a prompt across all activeProviders in parallel */
   async function callScrape(prompt: string) {
-    const providers = state.activeProviders.length > 0
-      ? state.activeProviders
-      : [state.provider];
+    const providers =
+      state.activeProviders.length > 0
+        ? state.activeProviders
+        : [state.provider];
     const count = providers.length;
     setBusy(true);
     setMessage(`Running across ${count} model${count > 1 ? "s" : ""}...`);
@@ -851,7 +1045,9 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
         .filter((r): r is ScrapeRun => r !== null);
 
       if (runs.length === 0) {
-        setMessage("All scrape requests failed. Check your Bright Data config.");
+        setMessage(
+          "All scrape requests failed. Check your Bright Data config.",
+        );
         return;
       }
 
@@ -865,7 +1061,9 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
         `Done: ${runs.length}/${count} model${count > 1 ? "s" : ""} returned results.${failed > 0 ? ` ${failed} failed.` : ""}`,
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to run scraper.");
+      setMessage(
+        error instanceof Error ? error.message : "Failed to run scraper.",
+      );
     } finally {
       setBusy(false);
     }
@@ -880,9 +1078,10 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       setMessage("No tracking prompts to run. Add prompts first.");
       return;
     }
-    const providers = state.activeProviders.length > 0
-      ? state.activeProviders
-      : [state.provider];
+    const providers =
+      state.activeProviders.length > 0
+        ? state.activeProviders
+        : [state.provider];
     const totalJobs = prompts.length * providers.length;
     setBusy(true);
     setMessage(`Batch: launching ${totalJobs} jobs in parallel...`);
@@ -921,7 +1120,8 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       .filter(Boolean);
 
     const fanout = personas.map(
-      (persona) => `${persona}: ${state.prompt} Respond with sources and direct claims first.`,
+      (persona) =>
+        `${persona}: ${state.prompt} Respond with sources and direct claims first.`,
     );
 
     setState((prev) => ({ ...prev, fanoutPrompts: fanout }));
@@ -932,7 +1132,13 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
     if (!cleaned) return;
     setState((prev) => {
       if (prev.customPrompts.some((p) => p.text === cleaned)) return prev;
-      return { ...prev, customPrompts: [{ text: cleaned, tags: [] }, ...prev.customPrompts].slice(0, 50) };
+      return {
+        ...prev,
+        customPrompts: [
+          { text: cleaned, tags: [] },
+          ...prev.customPrompts,
+        ].slice(0, 50),
+      };
     });
     setMessage("Tracking prompt added.");
   }
@@ -942,7 +1148,15 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       ...prev,
       customPrompts: prev.customPrompts.filter((entry) => entry.text !== value),
       runs: deleteResponses
-        ? prev.runs.filter((r) => r.prompt !== value && r.prompt !== value.replace(/\{brand\}/gi, prev.brand.brandName || "our brand"))
+        ? prev.runs.filter(
+            (r) =>
+              r.prompt !== value &&
+              r.prompt !==
+                value.replace(
+                  /\{brand\}/gi,
+                  prev.brand.brandName || "our brand",
+                ),
+          )
         : prev.runs,
     }));
   }
@@ -971,9 +1185,14 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
       content?: unknown;
     };
 
-    const directText = [data.text, data.output, data.response, data.content].find(
-      (value) => typeof value === "string" && value.trim().length > 0,
-    ) as string | undefined;
+    const directText = [
+      data.text,
+      data.output,
+      data.response,
+      data.content,
+    ].find((value) => typeof value === "string" && value.trim().length > 0) as
+      | string
+      | undefined;
 
     const raw = directText ?? "";
     // Strip markdown fences entirely
@@ -1009,14 +1228,22 @@ export function SovereignDashboard({ demoMode = false }: { demoMode?: boolean } 
           .trim(),
       )
       .filter((line) => line.length > 10 && line.length < 300)
-      .filter((line) => !/^(here\s+(are|is)|high[- ]intent|sure|certainly|below|the following)\b/i.test(line))
+      .filter(
+        (line) =>
+          !/^(here\s+(are|is)|high[- ]intent|sure|certainly|below|the following)\b/i.test(
+            line,
+          ),
+      )
       .filter((line) => line.includes(" ")); // must have at least 2 words
 
     return fromLines.slice(0, 20);
   }
 
   async function runNicheExplorer() {
-    if (demoMode) { setMessage("Demo mode — API calls are disabled"); return; }
+    if (demoMode) {
+      setMessage("Demo mode — API calls are disabled");
+      return;
+    }
     setBusy(true);
     setMessage("Generating niche queries...");
 
@@ -1037,7 +1264,8 @@ Requirements:
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Niche generation failed");
+      if (!response.ok)
+        throw new Error(data.error || "Niche generation failed");
 
       const queries = extractNicheQueries(data);
 
@@ -1048,14 +1276,19 @@ Requirements:
           : "No valid niche queries returned. Try a more specific niche.",
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed generating queries.");
+      setMessage(
+        error instanceof Error ? error.message : "Failed generating queries.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   async function runBattlecards() {
-    if (demoMode) { setMessage("Demo mode — API calls are disabled"); return; }
+    if (demoMode) {
+      setMessage("Demo mode — API calls are disabled");
+      return;
+    }
     setBusy(true);
     setMessage("Building competitor battlecards...");
 
@@ -1076,10 +1309,19 @@ Requirements:
           sentiment: "positive",
           summary: "Strong brand presence with frequent citations.",
           sections: [
-            { heading: "Strengths", points: ["High domain authority", "Frequent AI citations"] },
+            {
+              heading: "Strengths",
+              points: ["High domain authority", "Frequent AI citations"],
+            },
             { heading: "Weaknesses", points: ["Limited product range"] },
-            { heading: "Pricing", points: ["Premium tier: $99/mo", "Free plan available"] },
-            { heading: "AI Visibility", points: ["Mentioned in 8/10 tested prompts"] },
+            {
+              heading: "Pricing",
+              points: ["Premium tier: $99/mo", "Free plan available"],
+            },
+            {
+              heading: "AI Visibility",
+              points: ["Mentioned in 8/10 tested prompts"],
+            },
           ],
         },
       ]);
@@ -1105,13 +1347,17 @@ Return ONLY a valid JSON array. No markdown fences. No extra text. Example forma
 ${exampleJson}
 
 Now analyze all ${competitorList.length} competitors:`,
-          maxTokens: Math.max(2000, Math.min(4096, 500 * competitorList.length)),
+          maxTokens: Math.max(
+            2000,
+            Math.min(4096, 500 * competitorList.length),
+          ),
           temperature: 0.3,
           skipCache: true,
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Battlecard generation failed");
+      if (!response.ok)
+        throw new Error(data.error || "Battlecard generation failed");
 
       const text = String(data.text ?? "").trim();
 
@@ -1119,28 +1365,46 @@ Now analyze all ${competitorList.length} competitors:`,
 
       const normalizeBattlecards = (arr: unknown): Battlecard[] => {
         if (!Array.isArray(arr)) return [];
-        const mapped = arr
-          .map((item) => {
-            const record = (item ?? {}) as Record<string, unknown>;
-            const competitor = String(record.competitor ?? "").trim();
-            if (!competitor) return null;
-            const sentimentRaw = String(record.sentiment ?? "neutral").toLowerCase();
-            const sentiment = (["positive", "neutral", "negative"].includes(sentimentRaw)
+        const mapped = arr.map((item) => {
+          const record = (item ?? {}) as Record<string, unknown>;
+          const competitor = String(record.competitor ?? "").trim();
+          if (!competitor) return null;
+          const sentimentRaw = String(
+            record.sentiment ?? "neutral",
+          ).toLowerCase();
+          const sentiment = (
+            ["positive", "neutral", "negative"].includes(sentimentRaw)
               ? sentimentRaw
-              : "neutral") as "positive" | "neutral" | "negative";
-            const summary = String(record.summary ?? record.analysis ?? "No summary provided.").trim();
-            // Parse structured sections
-            const rawSections = Array.isArray(record.sections) ? record.sections : [];
-            const sections = rawSections
-              .map((s: unknown) => {
-                const sec = (s ?? {}) as Record<string, unknown>;
-                const heading = String(sec.heading ?? "").trim();
-                const points = Array.isArray(sec.points) ? sec.points.map((p: unknown) => String(p).trim()).filter(Boolean) : [];
-                return heading && points.length > 0 ? { heading, points } : null;
-              })
-              .filter((s): s is { heading: string; points: string[] } => s !== null);
-            return { competitor, sentiment, summary, sections: sections.length > 0 ? sections : undefined } as Battlecard;
-          });
+              : "neutral"
+          ) as "positive" | "neutral" | "negative";
+          const summary = String(
+            record.summary ?? record.analysis ?? "No summary provided.",
+          ).trim();
+          // Parse structured sections
+          const rawSections = Array.isArray(record.sections)
+            ? record.sections
+            : [];
+          const sections = rawSections
+            .map((s: unknown) => {
+              const sec = (s ?? {}) as Record<string, unknown>;
+              const heading = String(sec.heading ?? "").trim();
+              const points = Array.isArray(sec.points)
+                ? sec.points
+                    .map((p: unknown) => String(p).trim())
+                    .filter(Boolean)
+                : [];
+              return heading && points.length > 0 ? { heading, points } : null;
+            })
+            .filter(
+              (s): s is { heading: string; points: string[] } => s !== null,
+            );
+          return {
+            competitor,
+            sentiment,
+            summary,
+            sections: sections.length > 0 ? sections : undefined,
+          } as Battlecard;
+        });
         return mapped.filter((entry): entry is Battlecard => entry !== null);
       };
 
@@ -1158,7 +1422,10 @@ Now analyze all ${competitorList.length} competitors:`,
       }
 
       if (!parsed) {
-        const noFence = text.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+        const noFence = text
+          .replace(/```json\s*/gi, "")
+          .replace(/```/g, "")
+          .trim();
         const fromNoFence = parseCandidate(noFence);
         if (fromNoFence.length > 0) parsed = fromNoFence;
       }
@@ -1182,13 +1449,24 @@ Now analyze all ${competitorList.length} competitors:`,
       if (!parsed || parsed.length === 0) {
         parsed = competitorList.map((name) => {
           // Try to find a section about this competitor in the raw text
-          const namePattern = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+          const namePattern = new RegExp(
+            name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            "i",
+          );
           const idx = text.search(namePattern);
-          const snippet = idx >= 0 ? text.slice(idx, idx + 300).replace(/[#*`]/g, "").trim() : "";
+          const snippet =
+            idx >= 0
+              ? text
+                  .slice(idx, idx + 300)
+                  .replace(/[#*`]/g, "")
+                  .trim()
+              : "";
           return {
             competitor: name,
             sentiment: "neutral" as const,
-            summary: snippet || `AI could not generate structured analysis. Raw response: ${text.slice(0, 200)}`,
+            summary:
+              snippet ||
+              `AI could not generate structured analysis. Raw response: ${text.slice(0, 200)}`,
           };
         });
       }
@@ -1196,14 +1474,19 @@ Now analyze all ${competitorList.length} competitors:`,
       setState((prev) => ({ ...prev, battlecards: parsed! }));
       setMessage(`Battlecards ready for ${parsed!.length} competitors.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed building battlecards.");
+      setMessage(
+        error instanceof Error ? error.message : "Failed building battlecards.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   async function runAudit() {
-    if (demoMode) { setMessage("Demo mode — API calls are disabled"); return; }
+    if (demoMode) {
+      setMessage("Demo mode — API calls are disabled");
+      return;
+    }
     setBusy(true);
     setMessage("Running AEO audit...");
 
@@ -1219,15 +1502,25 @@ Now analyze all ${competitorList.length} competitors:`,
       setState((prev) => ({ ...prev, auditReport: data }));
       setMessage("Audit complete.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed running audit.");
+      setMessage(
+        error instanceof Error ? error.message : "Failed running audit.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   async function handleResetData() {
-    if (demoMode) { setMessage("Demo mode — data cannot be modified"); return; }
-    if (!window.confirm("This will delete ALL saved data (runs, prompts, settings). Continue?")) return;
+    if (demoMode) {
+      setMessage("Demo mode — data cannot be modified");
+      return;
+    }
+    if (
+      !window.confirm(
+        "This will delete ALL saved data (runs, prompts, settings). Continue?",
+      )
+    )
+      return;
     await clearSovereignStore(storageKeyForWorkspace(activeWsId));
     setState(defaultState);
     setMessage("All data cleared.");
@@ -1239,7 +1532,10 @@ Now analyze all ${competitorList.length} competitors:`,
         <ProjectSettingsTab
           brand={state.brand}
           onBrandChange={(patch) =>
-            setState((prev) => ({ ...prev, brand: { ...prev.brand, ...patch } }))
+            setState((prev) => ({
+              ...prev,
+              brand: { ...prev.brand, ...patch },
+            }))
           }
           onReset={handleResetData}
         />
@@ -1269,8 +1565,12 @@ Now analyze all ${competitorList.length} competitors:`,
           personas={state.personas}
           fanoutPrompts={state.fanoutPrompts}
           busy={busy}
-          onPromptChange={(value) => setState((prev) => ({ ...prev, prompt: value }))}
-          onPersonasChange={(value) => setState((prev) => ({ ...prev, personas: value }))}
+          onPromptChange={(value) =>
+            setState((prev) => ({ ...prev, prompt: value }))
+          }
+          onPersonasChange={(value) =>
+            setState((prev) => ({ ...prev, personas: value }))
+          }
           onGenerateFanout={generatePersonaFanout}
           onRunPrompt={callScrape}
         />
@@ -1283,7 +1583,9 @@ Now analyze all ${competitorList.length} competitors:`,
           niche={state.niche}
           nicheQueries={state.nicheQueries}
           trackedPrompts={state.customPrompts.map((p) => p.text)}
-          onNicheChange={(value) => setState((prev) => ({ ...prev, niche: value }))}
+          onNicheChange={(value) =>
+            setState((prev) => ({ ...prev, niche: value }))
+          }
           onGenerateQueries={runNicheExplorer}
           onAddToTracking={addCustomPrompt}
         />
@@ -1316,7 +1618,9 @@ Now analyze all ${competitorList.length} competitors:`,
         <BattlecardsTab
           competitors={state.competitors}
           battlecards={state.battlecards}
-          onCompetitorsChange={(competitors) => setState((prev) => ({ ...prev, competitors }))}
+          onCompetitorsChange={(competitors) =>
+            setState((prev) => ({ ...prev, competitors }))
+          }
           onBuildBattlecards={runBattlecards}
         />
       );
@@ -1335,15 +1639,27 @@ Now analyze all ${competitorList.length} competitors:`,
     }
 
     if (activeTab === "Visibility Analytics") {
-      return <VisibilityAnalyticsTab data={visibilityTrend} runs={state.runs} />;
+      return (
+        <VisibilityAnalyticsTab data={visibilityTrend} runs={state.runs} />
+      );
     }
 
     if (activeTab === "Citations") {
-      return <PartnerDiscoveryTab partnerLeaderboard={partnerLeaderboard} brandWebsites={state.brand.websites} />;
+      return (
+        <PartnerDiscoveryTab
+          partnerLeaderboard={partnerLeaderboard}
+          brandWebsites={state.brand.websites}
+        />
+      );
     }
 
     if (activeTab === "Citation Opportunities") {
-      return <CitationOpportunitiesTab runs={state.runs} brandWebsites={state.brand.websites} />;
+      return (
+        <CitationOpportunitiesTab
+          runs={state.runs}
+          brandWebsites={state.brand.websites}
+        />
+      );
     }
 
     if (activeTab === "SRO Analysis") {
@@ -1358,7 +1674,9 @@ Now analyze all ${competitorList.length} competitors:`,
       <AeoAuditTab
         auditUrl={state.auditUrl}
         auditReport={state.auditReport}
-        onAuditUrlChange={(value) => setState((prev) => ({ ...prev, auditUrl: value }))}
+        onAuditUrlChange={(value) =>
+          setState((prev) => ({ ...prev, auditUrl: value }))
+        }
         onRunAudit={runAudit}
       />
     );
@@ -1376,7 +1694,9 @@ Now analyze all ${competitorList.length} competitors:`,
         />
       )}
       {/* ── Sidebar ──────────────────────────────────── */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[250px] shrink-0 flex-col border-r border-th-border bg-th-sidebar transition-transform duration-200 md:static md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[250px] shrink-0 flex-col border-r border-th-border bg-th-sidebar transition-transform duration-200 md:static md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
         {/* Brand / Workspace switcher */}
         <div className="border-b border-th-border px-4 py-3">
           {demoMode ? (
@@ -1394,68 +1714,77 @@ Now analyze all ${competitorList.length} competitors:`,
               </div>
             </div>
           ) : (
-          <>
-          <button
-            onClick={() => setShowWsPicker(!showWsPicker)}
-            className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-th-card-hover transition-colors"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-th-accent">
-              <span className="text-xs font-bold text-th-text-inverse">
-                {(state.brand.brandName || "AE").slice(0, 2).toUpperCase()}
-              </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-th-text">
-                {state.brand.brandName || "AEO Tracker"}
-              </div>
-              {state.brand.websites.length > 0 && (
-                <div className="truncate text-xs text-th-text-muted">{state.brand.websites[0].replace(/^https?:\/\//, "")}{state.brand.websites.length > 1 ? ` +${state.brand.websites.length - 1}` : ""}</div>
-              )}
-            </div>
-            <span className="text-xs text-th-text-muted">{showWsPicker ? "▲" : "▼"}</span>
-          </button>
-
-          {/* Workspace dropdown */}
-          {showWsPicker && (
-            <div className="mt-2 rounded-lg border border-th-border bg-th-card p-2 shadow-lg">
-              <div className="mb-2 text-xs font-medium text-th-text-muted uppercase tracking-wider">Workspaces</div>
-              <div className="max-h-[200px] space-y-1 overflow-auto">
-                {workspaces.map((ws) => (
-                  <div key={ws.id} className="flex items-center gap-1">
-                    <button
-                      onClick={() => switchWorkspace(ws.id)}
-                      className={`flex-1 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-                        ws.id === activeWsId
-                          ? "bg-th-accent-soft text-th-text-accent font-medium"
-                          : "text-th-text-secondary hover:bg-th-card-hover"
-                      }`}
-                    >
-                      {ws.brandName || "Untitled"}
-                    </button>
-                    {workspaces.length > 1 && (
-                      <button
-                        onClick={() => deleteWorkspace(ws.id)}
-                        className="rounded p-1 text-xs text-th-text-muted hover:text-th-danger hover:bg-th-danger-soft"
-                        title="Delete workspace"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+            <>
               <button
-                onClick={() => {
-                  const name = window.prompt("Brand / workspace name:");
-                  if (name?.trim()) createWorkspace(name.trim());
-                }}
-                className="mt-2 flex w-full items-center gap-1.5 rounded-md border border-dashed border-th-border px-2 py-1.5 text-sm text-th-text-accent hover:bg-th-accent-soft transition-colors"
+                onClick={() => setShowWsPicker(!showWsPicker)}
+                className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-th-card-hover transition-colors"
               >
-                <span className="text-base">+</span> New Brand
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-th-accent">
+                  <span className="text-xs font-bold text-th-text-inverse">
+                    {(state.brand.brandName || "AE").slice(0, 2).toUpperCase()}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-th-text">
+                    {state.brand.brandName || "AEO Tracker"}
+                  </div>
+                  {state.brand.websites.length > 0 && (
+                    <div className="truncate text-xs text-th-text-muted">
+                      {state.brand.websites[0].replace(/^https?:\/\//, "")}
+                      {state.brand.websites.length > 1
+                        ? ` +${state.brand.websites.length - 1}`
+                        : ""}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-th-text-muted">
+                  {showWsPicker ? "▲" : "▼"}
+                </span>
               </button>
-            </div>
-          )}
-          </>
+
+              {/* Workspace dropdown */}
+              {showWsPicker && (
+                <div className="mt-2 rounded-lg border border-th-border bg-th-card p-2 shadow-lg">
+                  <div className="mb-2 text-xs font-medium text-th-text-muted uppercase tracking-wider">
+                    Workspaces
+                  </div>
+                  <div className="max-h-[200px] space-y-1 overflow-auto">
+                    {workspaces.map((ws) => (
+                      <div key={ws.id} className="flex items-center gap-1">
+                        <button
+                          onClick={() => switchWorkspace(ws.id)}
+                          className={`flex-1 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
+                            ws.id === activeWsId
+                              ? "bg-th-accent-soft text-th-text-accent font-medium"
+                              : "text-th-text-secondary hover:bg-th-card-hover"
+                          }`}
+                        >
+                          {ws.brandName || "Untitled"}
+                        </button>
+                        {workspaces.length > 1 && (
+                          <button
+                            onClick={() => deleteWorkspace(ws.id)}
+                            className="rounded p-1 text-xs text-th-text-muted hover:text-th-danger hover:bg-th-danger-soft"
+                            title="Delete workspace"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const name = window.prompt("Brand / workspace name:");
+                      if (name?.trim()) createWorkspace(name.trim());
+                    }}
+                    className="mt-2 flex w-full items-center gap-1.5 rounded-md border border-dashed border-th-border px-2 py-1.5 text-sm text-th-text-accent hover:bg-th-accent-soft transition-colors"
+                  >
+                    <span className="text-base">+</span> New Brand
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -1473,15 +1802,28 @@ Now analyze all ${competitorList.length} competitors:`,
                 )}
                 <button
                   title={tabMeta[tab].tooltip}
-                  onClick={() => { setActiveTab(tab); setSidebarOpen(false); }}
+                  onClick={() => {
+                    setActiveTab(tab);
+                    setSidebarOpen(false);
+                  }}
                   className={`group mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
                     active
                       ? "bg-th-accent-soft text-th-text font-medium"
                       : "text-th-text-secondary hover:bg-th-card-hover hover:text-th-text"
                   }`}
-                  style={active ? { boxShadow: "inset 3px 0 0 var(--th-accent)" } : undefined}
+                  style={
+                    active
+                      ? { boxShadow: "inset 3px 0 0 var(--th-accent)" }
+                      : undefined
+                  }
                 >
-                  <span className={active ? "text-th-text-accent" : "text-th-text-muted group-hover:text-th-text-secondary"}>
+                  <span
+                    className={
+                      active
+                        ? "text-th-text-accent"
+                        : "text-th-text-muted group-hover:text-th-text-secondary"
+                    }
+                  >
                     {tabIcons[tab]}
                   </span>
                   {tabMeta[tab].title}
@@ -1510,22 +1852,55 @@ Now analyze all ${competitorList.length} competitors:`,
             className="group flex flex-col items-center gap-2 rounded-xl bg-gradient-to-br from-[#1a6dff] via-[#3b82f6] to-[#6366f1] px-4 py-4 shadow-lg transition-all hover:shadow-xl hover:brightness-110"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
             </div>
             <div className="text-center">
-              <div className="text-sm font-bold text-white">Powered by Bright Data</div>
-              <div className="mt-0.5 text-xs text-white/70">Web data infrastructure for AI</div>
+              <div className="text-sm font-bold text-white">
+                Powered by Bright Data
+              </div>
+              <div className="mt-0.5 text-xs text-white/70">
+                Web data infrastructure for AI
+              </div>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 text-xs font-medium text-white transition-colors group-hover:bg-white/25">
               Learn more
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
             </div>
           </a>
         </div>
 
         {/* Footer info */}
         <div className="border-t border-th-border px-4 py-2 text-center text-xs leading-relaxed text-th-text-muted">
-          <div>{demoMode ? "Read-only demo" : `Local-first · ${workspaces.length} workspace${workspaces.length > 1 ? "s" : ""}`}</div>
+          <div>
+            {demoMode
+              ? "Read-only demo"
+              : `Local-first · ${workspaces.length} workspace${workspaces.length > 1 ? "s" : ""}`}
+          </div>
           <div className="mt-1">
             Built by{" "}
             <a
@@ -1546,7 +1921,10 @@ Now analyze all ${competitorList.length} competitors:`,
         {demoMode && (
           <div className="flex shrink-0 items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm">
             <span>🎯</span>
-            <span>You&apos;re viewing a read-only demo — data is pre-loaded and API calls are disabled</span>
+            <span>
+              You&apos;re viewing a read-only demo — data is pre-loaded and API
+              calls are disabled
+            </span>
           </div>
         )}
         {/* Toolbar */}
@@ -1557,10 +1935,27 @@ Now analyze all ${competitorList.length} competitors:`,
             className="rounded-md border border-th-border p-1.5 text-th-text-muted hover:bg-th-card-hover md:hidden"
             aria-label="Toggle sidebar"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
           </button>
-          <h1 className="mr-auto text-sm font-semibold text-th-text md:text-base">{tabMeta[activeTab].title}</h1>
-          <label className="hidden text-sm text-th-text-muted sm:inline">Models</label>
+          <h1 className="mr-auto text-sm font-semibold text-th-text md:text-base">
+            {tabMeta[activeTab].title}
+          </h1>
+          <label className="hidden text-sm text-th-text-muted sm:inline">
+            Models
+          </label>
           <div className="flex items-center gap-1 overflow-x-auto">
             {ALL_PROVIDERS.map((p) => {
               const active = state.activeProviders.includes(p);
@@ -1573,7 +1968,11 @@ Now analyze all ${competitorList.length} competitors:`,
                         ? prev.activeProviders.filter((x) => x !== p)
                         : [...prev.activeProviders, p];
                       if (next.length === 0) return prev;
-                      return { ...prev, activeProviders: next, provider: next[0] };
+                      return {
+                        ...prev,
+                        activeProviders: next,
+                        provider: next[0],
+                      };
                     })
                   }
                   className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
@@ -1581,7 +1980,11 @@ Now analyze all ${competitorList.length} competitors:`,
                       ? "bg-th-accent text-th-text-inverse"
                       : "bg-th-card-alt text-th-text-muted hover:bg-th-card-hover hover:text-th-text-secondary"
                   }`}
-                  title={active ? `Deselect ${PROVIDER_LABELS[p]}` : `Select ${PROVIDER_LABELS[p]}`}
+                  title={
+                    active
+                      ? `Deselect ${PROVIDER_LABELS[p]}`
+                      : `Select ${PROVIDER_LABELS[p]}`
+                  }
                 >
                   {PROVIDER_LABELS[p]}
                 </button>
@@ -1591,13 +1994,22 @@ Now analyze all ${competitorList.length} competitors:`,
               onClick={() =>
                 setState((prev) => ({
                   ...prev,
-                  activeProviders: prev.activeProviders.length === ALL_PROVIDERS.length ? [prev.provider] : [...ALL_PROVIDERS],
+                  activeProviders:
+                    prev.activeProviders.length === ALL_PROVIDERS.length
+                      ? [prev.provider]
+                      : [...ALL_PROVIDERS],
                 }))
               }
               className="ml-1 rounded-md border border-th-border px-2 py-1 text-xs text-th-text-muted hover:bg-th-card-hover hover:text-th-text-secondary"
-              title={state.activeProviders.length === ALL_PROVIDERS.length ? "Select only one" : "Select all models"}
+              title={
+                state.activeProviders.length === ALL_PROVIDERS.length
+                  ? "Select only one"
+                  : "Select all models"
+              }
             >
-              {state.activeProviders.length === ALL_PROVIDERS.length ? "1" : "All"}
+              {state.activeProviders.length === ALL_PROVIDERS.length
+                ? "1"
+                : "All"}
             </button>
           </div>
 
@@ -1610,7 +2022,9 @@ Now analyze all ${competitorList.length} competitors:`,
             {themeIcon}
           </button>
 
-          <span className={`rounded-md px-2.5 py-1 text-xs ${busy ? "animate-pulse bg-th-accent-soft text-th-text-accent" : "bg-th-card-alt text-th-text-muted"}`}>
+          <span
+            className={`rounded-md px-2.5 py-1 text-xs ${busy ? "animate-pulse bg-th-accent-soft text-th-text-accent" : "bg-th-card-alt text-th-text-muted"}`}
+          >
             {message || "Ready"}
           </span>
         </header>
@@ -1633,7 +2047,10 @@ Now analyze all ${competitorList.length} competitors:`,
             />
             <KpiCard
               label="Brand Mentioned"
-              value={state.runs.filter((r) => (r.brandMentions?.length ?? 0) > 0).length}
+              value={
+                state.runs.filter((r) => (r.brandMentions?.length ?? 0) > 0)
+                  .length
+              }
             />
             <KpiCard label="Captured Sources" value={totalSources} />
             <KpiCard label="Citation Opps" value={citationOpportunities} />
@@ -1653,8 +2070,12 @@ Now analyze all ${competitorList.length} competitors:`,
             <section className="mb-4 rounded-xl border border-th-border bg-th-card p-4">
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-base">📊</span>
-                <h3 className="text-sm font-semibold text-th-text">Top Movers</h3>
-                <span className="text-xs text-th-text-muted">Biggest visibility changes between runs</span>
+                <h3 className="text-sm font-semibold text-th-text">
+                  Top Movers
+                </h3>
+                <span className="text-xs text-th-text-muted">
+                  Biggest visibility changes between runs
+                </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {movers.map((m, i) => {
@@ -1668,15 +2089,24 @@ Now analyze all ${competitorList.length} competitors:`,
                           : "border-th-danger/30 bg-th-danger-soft"
                       }`}
                     >
-                      <span className={`text-lg font-bold ${up ? "text-th-success" : "text-th-danger"}`}>
-                        {up ? "↑" : "↓"}{Math.abs(m.delta)}
+                      <span
+                        className={`text-lg font-bold ${up ? "text-th-success" : "text-th-danger"}`}
+                      >
+                        {up ? "↑" : "↓"}
+                        {Math.abs(m.delta)}
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-medium text-th-text" style={{ maxWidth: "180px" }}>
-                          {m.prompt.length > 50 ? m.prompt.slice(0, 47) + "…" : m.prompt}
+                        <div
+                          className="truncate text-xs font-medium text-th-text"
+                          style={{ maxWidth: "180px" }}
+                        >
+                          {m.prompt.length > 50
+                            ? m.prompt.slice(0, 47) + "…"
+                            : m.prompt}
                         </div>
                         <div className="text-xs text-th-text-muted">
-                          {PROVIDER_LABELS[m.provider]} · {m.previousScore}→{m.currentScore}
+                          {PROVIDER_LABELS[m.provider]} · {m.previousScore}→
+                          {m.currentScore}
                         </div>
                       </div>
                     </div>
@@ -1690,25 +2120,65 @@ Now analyze all ${competitorList.length} competitors:`,
           {showScoreInfo && (
             <section className="mb-4 rounded-xl border border-th-border bg-th-card p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold text-th-text">How Visibility Scoring Works</h3>
-                <button onClick={() => setShowScoreInfo(false)} className="text-th-text-muted hover:text-th-text text-lg">✕</button>
+                <h3 className="text-base font-semibold text-th-text">
+                  How Visibility Scoring Works
+                </h3>
+                <button
+                  onClick={() => setShowScoreInfo(false)}
+                  className="text-th-text-muted hover:text-th-text text-lg"
+                >
+                  ✕
+                </button>
               </div>
               <p className="text-sm text-th-text-secondary mb-3">
-                The visibility score (0–100) measures how prominently your brand appears in AI model responses. Each factor contributes points:
+                The visibility score (0–100) measures how prominently your brand
+                appears in AI model responses. Each factor contributes points:
               </p>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <ScoreFactorCard emoji="🔍" label="Brand Mentioned" points="+30" desc="Your brand name or alias appears in the response" />
-                <ScoreFactorCard emoji="🏆" label="Prominent Position" points="+20" desc="Brand is mentioned in the first 200 characters" />
-                <ScoreFactorCard emoji="🔁" label="Multiple Mentions" points="+8 to +15" desc="Brand appears 2+ times (8pts) or 3+ times (15pts)" />
-                <ScoreFactorCard emoji="🔗" label="Website Cited" points="+20" desc="Your website URL appears in the cited sources" />
-                <ScoreFactorCard emoji="👍" label="Positive Sentiment" points="+15" desc="Response uses positive language about your brand" />
-                <ScoreFactorCard emoji="😐" label="Neutral Sentiment" points="+5" desc="Response mentions brand in a neutral context" />
+                <ScoreFactorCard
+                  emoji="🔍"
+                  label="Brand Mentioned"
+                  points="+30"
+                  desc="Your brand name or alias appears in the response"
+                />
+                <ScoreFactorCard
+                  emoji="🏆"
+                  label="Prominent Position"
+                  points="+20"
+                  desc="Brand is mentioned in the first 200 characters"
+                />
+                <ScoreFactorCard
+                  emoji="🔁"
+                  label="Multiple Mentions"
+                  points="+8 to +15"
+                  desc="Brand appears 2+ times (8pts) or 3+ times (15pts)"
+                />
+                <ScoreFactorCard
+                  emoji="🔗"
+                  label="Website Cited"
+                  points="+20"
+                  desc="Your website URL appears in the cited sources"
+                />
+                <ScoreFactorCard
+                  emoji="👍"
+                  label="Positive Sentiment"
+                  points="+15"
+                  desc="Response uses positive language about your brand"
+                />
+                <ScoreFactorCard
+                  emoji="😐"
+                  label="Neutral Sentiment"
+                  points="+5"
+                  desc="Response mentions brand in a neutral context"
+                />
               </div>
             </section>
           )}
 
           {/* Active tab panel */}
-          <section className="rounded-xl border border-th-border bg-th-card p-5 shadow-sm">{renderActiveTab()}</section>
+          <section className="rounded-xl border border-th-border bg-th-card p-5 shadow-sm">
+            {renderActiveTab()}
+          </section>
           {/* SRO Analysis stays mounted to preserve in-flight state */}
           <div className={activeTab === "SRO Analysis" ? "" : "hidden"}>
             <section className="rounded-xl border border-th-border bg-th-card p-5 shadow-sm">
@@ -1716,8 +2186,12 @@ Now analyze all ${competitorList.length} competitors:`,
             </section>
           </div>
           <section className="mt-3 rounded-lg border border-th-border bg-th-card px-4 py-3">
-            <div className="text-xs uppercase tracking-wider font-medium text-th-text-muted">What this tab does</div>
-            <p className="mt-1 text-sm leading-relaxed text-th-text-secondary">{tabMeta[activeTab].details}</p>
+            <div className="text-xs uppercase tracking-wider font-medium text-th-text-muted">
+              What this tab does
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-th-text-secondary">
+              {tabMeta[activeTab].details}
+            </p>
           </section>
         </main>
       </div>
@@ -1726,13 +2200,25 @@ Now analyze all ${competitorList.length} competitors:`,
 }
 
 /* ── Score Factor Card ────────────────────────────────────────── */
-function ScoreFactorCard({ emoji, label, points, desc }: { emoji: string; label: string; points: string; desc: string }) {
+function ScoreFactorCard({
+  emoji,
+  label,
+  points,
+  desc,
+}: {
+  emoji: string;
+  label: string;
+  points: string;
+  desc: string;
+}) {
   return (
     <div className="rounded-lg border border-th-border bg-th-card-alt px-3 py-2.5">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-base">{emoji}</span>
         <span className="text-sm font-medium text-th-text">{label}</span>
-        <span className="ml-auto text-sm font-semibold text-th-accent">{points}</span>
+        <span className="ml-auto text-sm font-semibold text-th-accent">
+          {points}
+        </span>
       </div>
       <p className="text-xs text-th-text-muted leading-relaxed">{desc}</p>
     </div>
@@ -1740,20 +2226,45 @@ function ScoreFactorCard({ emoji, label, points, desc }: { emoji: string; label:
 }
 
 /* ── Compact KPI Card ─────────────────────────────────────────── */
-function KpiCard({ label, value, small, delta, onInfoClick }: { label: string; value: string | number; small?: boolean; delta?: number | null; onInfoClick?: () => void }) {
+function KpiCard({
+  label,
+  value,
+  small,
+  delta,
+  onInfoClick,
+}: {
+  label: string;
+  value: string | number;
+  small?: boolean;
+  delta?: number | null;
+  onInfoClick?: () => void;
+}) {
   return (
     <div className="rounded-xl border border-th-border bg-th-card px-4 py-3 shadow-sm">
       <div className="flex items-center gap-1">
-        <div className="text-xs font-medium uppercase tracking-wider text-th-text-muted">{label}</div>
+        <div className="text-xs font-medium uppercase tracking-wider text-th-text-muted">
+          {label}
+        </div>
         {onInfoClick && (
-          <button onClick={onInfoClick} className="text-th-text-muted hover:text-th-text-accent text-xs" title="How is this calculated?">ⓘ</button>
+          <button
+            onClick={onInfoClick}
+            className="text-th-text-muted hover:text-th-text-accent text-xs"
+            title="How is this calculated?"
+          >
+            ⓘ
+          </button>
         )}
       </div>
-      <div className={`mt-1 flex items-center gap-1.5 font-semibold text-th-text ${small ? "text-base" : "text-xl"}`}>
+      <div
+        className={`mt-1 flex items-center gap-1.5 font-semibold text-th-text ${small ? "text-base" : "text-xl"}`}
+      >
         {value}
         {delta != null && delta !== 0 && (
-          <span className={`text-xs font-bold ${delta > 0 ? "text-th-success" : "text-th-danger"}`}>
-            {delta > 0 ? "↑" : "↓"}{Math.abs(delta)}
+          <span
+            className={`text-xs font-bold ${delta > 0 ? "text-th-success" : "text-th-danger"}`}
+          >
+            {delta > 0 ? "↑" : "↓"}
+            {Math.abs(delta)}
           </span>
         )}
       </div>
