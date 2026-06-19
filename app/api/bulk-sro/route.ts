@@ -5,15 +5,26 @@ import { scrapeAllPlatforms } from "@/lib/server/brightdata-platforms";
 import { fetchSerp } from "@/lib/server/serp";
 import { scrapePage, scrapePages } from "@/lib/server/unlocker";
 import { analyzeSRO } from "@/lib/server/openrouter-sro";
-import type { BulkItemProgress, BulkAnalysisResult, AnalysisInput, PlatformResult, ScrapedPage } from "@/lib/server/sro-types";
+import type {
+  BulkItemProgress,
+  BulkAnalysisResult,
+  AnalysisInput,
+  PlatformResult,
+  ScrapedPage,
+} from "@/lib/server/sro-types";
+
+export const runtime = "nodejs";
 
 const requestSchema = z.object({
-  items: z.array(
-    z.object({
-      url: z.string().url(),
-      keyword: z.string().min(1),
-    })
-  ).min(1).max(20),
+  items: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        keyword: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(20),
 });
 
 function sseEvent(type: string, data: unknown): string {
@@ -35,15 +46,29 @@ export async function POST(req: NextRequest) {
   }
 
   const encoder = new TextEncoder();
+  // Tracks client disconnect so we stop running (and stop paying for) the
+  // remaining items once nobody is listening.
+  let cancelled = false;
+  req.signal.addEventListener("abort", () => {
+    cancelled = true;
+  });
+
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
       function send(type: string, data: unknown) {
-        controller.enqueue(encoder.encode(sseEvent(type, data)));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(sseEvent(type, data)));
+        } catch {
+          closed = true;
+        }
       }
 
       send("start", { total: items.length });
 
       for (let i = 0; i < items.length; i++) {
+        if (cancelled || req.signal.aborted) break;
         const item = items[i];
         const progress = (stage: BulkItemProgress["stage"], error?: string) => {
           const p: BulkItemProgress = {
@@ -92,7 +117,9 @@ export async function POST(req: NextRequest) {
 
           if (serp && serp.topCompetitors.length > 0) {
             try {
-              competitorPages = await scrapePages(serp.topCompetitors.slice(0, 3));
+              competitorPages = await scrapePages(
+                serp.topCompetitors.slice(0, 3),
+              );
             } catch {
               // Competitor scrape optional
             }
@@ -134,8 +161,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      send("complete", { total: items.length });
-      controller.close();
+      if (!cancelled && !req.signal.aborted)
+        send("complete", { total: items.length });
+      if (!closed) {
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      }
+    },
+    cancel() {
+      cancelled = true;
     },
   });
 

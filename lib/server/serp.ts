@@ -1,4 +1,5 @@
 import type { SerpResult, SerpOrganicResult } from "./sro-types";
+import { fetchWithTimeout } from "./http";
 
 function extractDomain(url: string): string {
   try {
@@ -21,7 +22,7 @@ function emptyResult(keyword: string): SerpResult {
 
 export async function fetchSerp(
   keyword: string,
-  targetUrl: string
+  targetUrl: string,
 ): Promise<SerpResult> {
   const apiKey = process.env.BRIGHT_DATA_KEY;
   const zone = process.env.BRIGHT_DATA_SERP_ZONE || "serp_n8n";
@@ -36,26 +37,38 @@ export async function fetchSerp(
   const googleUrl = `https://www.google.com/search?q=${encodedQuery}&gl=us&brd_json=1`;
 
   try {
-    const response = await fetch("https://api.brightdata.com/request", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const response = await fetchWithTimeout(
+      "https://api.brightdata.com/request",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          zone,
+          url: googleUrl,
+          format: "json",
+        }),
       },
-      body: JSON.stringify({
-        zone,
-        url: googleUrl,
-        format: "json",
-      }),
-    });
+      45_000,
+    );
 
     if (!response.ok) {
-      console.error(`[SERP] API error: ${response.status} ${response.statusText}`);
+      console.error(
+        `[SERP] API error: ${response.status} ${response.statusText}`,
+      );
       return emptyResult(keyword);
     }
 
     const data = await response.json();
-    const body = typeof data.body === "string" ? JSON.parse(data.body) : data.body;
+    let body: { organic?: unknown[] } | undefined;
+    try {
+      body = typeof data.body === "string" ? JSON.parse(data.body) : data.body;
+    } catch {
+      console.error("[SERP] Failed to parse response body as JSON");
+      return emptyResult(keyword);
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawOrganic: any[] = body?.organic ?? [];
 
@@ -66,7 +79,8 @@ export async function fetchSerp(
     for (const item of rawOrganic) {
       const url = item.link ?? "";
       const domain = extractDomain(url);
-      const position = item.rank ?? item.global_rank ?? organicResults.length + 1;
+      const position =
+        item.rank ?? item.global_rank ?? organicResults.length + 1;
       const isTarget = domain === targetDomain;
 
       organicResults.push({

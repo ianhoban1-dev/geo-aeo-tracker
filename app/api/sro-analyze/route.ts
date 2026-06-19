@@ -9,15 +9,22 @@ import type {
   SiteContext,
 } from "@/lib/server/sro-types";
 
+export const runtime = "nodejs";
+
+// These come from prior pipeline stages, so the shapes are large and varied.
+// We don't re-validate every field, but we DO require objects (not arbitrary
+// scalars) and cap array sizes so a malicious client can't push a giant payload
+// straight into an LLM prompt.
+const looseObject = z.object({}).passthrough();
 const requestSchema = z.object({
   targetUrl: z.string().url(),
-  keyword: z.string().min(1),
-  grounding: z.any().nullable().optional(),
-  platforms: z.array(z.any()).optional().default([]),
-  serp: z.any().nullable().optional(),
-  targetPage: z.any().nullable().optional(),
-  competitorPages: z.array(z.any()).optional().default([]),
-  siteContext: z.any().nullable().optional(),
+  keyword: z.string().min(1).max(500),
+  grounding: looseObject.nullable().optional(),
+  platforms: z.array(looseObject).max(12).optional().default([]),
+  serp: looseObject.nullable().optional(),
+  targetPage: looseObject.nullable().optional(),
+  competitorPages: z.array(looseObject).max(10).optional().default([]),
+  siteContext: looseObject.nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -28,12 +35,13 @@ export async function POST(req: NextRequest) {
     const result = await analyzeSRO({
       targetUrl: parsed.targetUrl,
       keyword: parsed.keyword,
-      grounding: (parsed.grounding as GroundingResult) ?? null,
-      platforms: (parsed.platforms as PlatformResult[]) ?? [],
-      serp: (parsed.serp as SerpResult) ?? null,
-      targetPage: (parsed.targetPage as ScrapedPage) ?? null,
-      competitorPages: (parsed.competitorPages as ScrapedPage[]) ?? [],
-      siteContext: (parsed.siteContext as SiteContext) ?? null,
+      grounding: (parsed.grounding as unknown as GroundingResult) ?? null,
+      platforms: (parsed.platforms as unknown as PlatformResult[]) ?? [],
+      serp: (parsed.serp as unknown as SerpResult) ?? null,
+      targetPage: (parsed.targetPage as unknown as ScrapedPage) ?? null,
+      competitorPages:
+        (parsed.competitorPages as unknown as ScrapedPage[]) ?? [],
+      siteContext: (parsed.siteContext as unknown as SiteContext) ?? null,
     });
 
     return NextResponse.json(result);

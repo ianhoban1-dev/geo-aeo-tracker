@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { scrapePage } from "@/lib/server/unlocker";
+import { fetchWithTimeout } from "@/lib/server/http";
 import type { SiteContext } from "@/lib/server/sro-types";
+
+export const runtime = "nodejs";
+
+const uniq = (arr: string[]) => [
+  ...new Set(arr.map((s) => s.trim()).filter(Boolean)),
+];
 
 const requestSchema = z.object({
   url: z.string().url(),
@@ -44,13 +51,14 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.OPENROUTER_KEY;
 
     if (!apiKey) {
+      const headings = uniq(page.headings);
       const ctx: SiteContext = {
         domain,
         homepageUrl,
-        primaryTopics: page.headings.slice(0, 10),
+        primaryTopics: headings.slice(0, 10),
         industry: "Unknown",
         targetAudience: "Unknown",
-        contentThemes: page.headings.slice(0, 5),
+        contentThemes: headings.slice(0, 5),
         siteDescription: page.contentSnippet.slice(0, 300),
       };
       return NextResponse.json(ctx);
@@ -70,28 +78,33 @@ Headings: ${page.headings.slice(0, 20).join(", ")}
 Content snippet:
 ${snippet}`;
 
-    const llmResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const llmResp = await fetchWithTimeout(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-001",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 1000,
+          temperature: 0.1,
+        }),
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 1000,
-        temperature: 0.1,
-      }),
-    });
+      45_000,
+    );
 
     if (!llmResp.ok) {
+      const headings = uniq(page.headings);
       const ctx: SiteContext = {
         domain,
         homepageUrl,
-        primaryTopics: page.headings.slice(0, 10),
+        primaryTopics: headings.slice(0, 10),
         industry: "Unknown",
         targetAudience: "Unknown",
-        contentThemes: page.headings.slice(0, 5),
+        contentThemes: headings.slice(0, 5),
         siteDescription: page.contentSnippet.slice(0, 300),
       };
       return NextResponse.json(ctx);
@@ -111,26 +124,40 @@ ${snippet}`;
         domain,
         homepageUrl,
         primaryTopics: Array.isArray(parsed.primaryTopics)
-          ? parsed.primaryTopics.filter((t: unknown) => typeof t === "string")
+          ? uniq(
+              parsed.primaryTopics.filter(
+                (t: unknown): t is string => typeof t === "string",
+              ),
+            )
           : [],
-        industry: typeof parsed.industry === "string" ? parsed.industry : "Unknown",
+        industry:
+          typeof parsed.industry === "string" ? parsed.industry : "Unknown",
         targetAudience:
-          typeof parsed.targetAudience === "string" ? parsed.targetAudience : "Unknown",
+          typeof parsed.targetAudience === "string"
+            ? parsed.targetAudience
+            : "Unknown",
         contentThemes: Array.isArray(parsed.contentThemes)
-          ? parsed.contentThemes.filter((t: unknown) => typeof t === "string")
+          ? uniq(
+              parsed.contentThemes.filter(
+                (t: unknown): t is string => typeof t === "string",
+              ),
+            )
           : [],
         siteDescription:
-          typeof parsed.siteDescription === "string" ? parsed.siteDescription : "",
+          typeof parsed.siteDescription === "string"
+            ? parsed.siteDescription
+            : "",
       };
       return NextResponse.json(ctx);
     } catch {
+      const headings = uniq(page.headings);
       const ctx: SiteContext = {
         domain,
         homepageUrl,
-        primaryTopics: page.headings.slice(0, 10),
+        primaryTopics: headings.slice(0, 10),
         industry: "Unknown",
         targetAudience: "Unknown",
-        contentThemes: page.headings.slice(0, 5),
+        contentThemes: headings.slice(0, 5),
         siteDescription: page.contentSnippet.slice(0, 300),
       };
       return NextResponse.json(ctx);

@@ -317,6 +317,8 @@ export function SovereignDashboard({
    * overwrites stored data during the async load (a data-loss race).
    */
   const hydratedRef = useRef(false);
+  /** Debounce timer so rapid edits (typing) don't hammer IDB/cloud on every keystroke. */
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /** Apply theme class to <html> */
   const applyTheme = useCallback((t: "light" | "dark" | "system") => {
@@ -453,7 +455,13 @@ export function SovereignDashboard({
 
   useEffect(() => {
     if (demoMode || !activeWsId || !hydratedRef.current) return;
-    saveSovereignValue(storageKeyForWorkspace(activeWsId), state);
+    // Debounce the (possibly network-bound, in cloud mode) save.
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const wsId = activeWsId;
+    const snapshot = state;
+    saveTimerRef.current = setTimeout(() => {
+      saveSovereignValue(storageKeyForWorkspace(wsId), snapshot);
+    }, 600);
     // Update workspace brandName if changed
     if (state.brand.brandName) {
       setWorkspaces((prev) => {

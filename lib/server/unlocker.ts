@@ -1,4 +1,5 @@
 import type { ScrapedPage } from "./sro-types";
+import { fetchWithTimeout } from "./http";
 
 const API_URL = "https://api.brightdata.com/request";
 
@@ -60,13 +61,18 @@ export async function scrapePage(url: string): Promise<ScrapedPage> {
   const zone = process.env.BRIGHT_DATA_UNLOCKER_ZONE || "web_unlocker1";
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithTimeout(API_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ zone, url, format: "raw", data_format: "markdown" }),
+      body: JSON.stringify({
+        zone,
+        url,
+        format: "raw",
+        data_format: "markdown",
+      }),
     });
 
     if (!response.ok) {

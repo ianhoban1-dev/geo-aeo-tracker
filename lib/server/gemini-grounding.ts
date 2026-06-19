@@ -1,4 +1,9 @@
-import type { GroundingResult, GroundingChunk as AppGroundingChunk, GroundingSupport } from "./sro-types";
+import type {
+  GroundingResult,
+  GroundingChunk as AppGroundingChunk,
+  GroundingSupport,
+} from "./sro-types";
+import { withTimeout } from "./http";
 
 function extractDomain(url: string): string {
   try {
@@ -18,7 +23,10 @@ function urlMatchesTarget(sourceUrl: string, targetUrl: string): boolean {
   try {
     const source = new URL(sourceUrl);
     const target = new URL(targetUrl);
-    if (source.hostname.replace(/^www\./, "") === target.hostname.replace(/^www\./, "")) {
+    if (
+      source.hostname.replace(/^www\./, "") ===
+      target.hostname.replace(/^www\./, "")
+    ) {
       return true;
     }
   } catch {
@@ -30,7 +38,7 @@ function urlMatchesTarget(sourceUrl: string, targetUrl: string): boolean {
 
 export async function analyzeGrounding(
   keyword: string,
-  targetUrl: string
+  targetUrl: string,
 ): Promise<GroundingResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -41,13 +49,17 @@ export async function analyzeGrounding(
   const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI({ apiKey });
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: keyword,
-    config: {
-      tools: [{ googleSearch: {} }],
-    },
-  });
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: keyword,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    }),
+    45_000,
+    "gemini grounding",
+  );
 
   const candidate = response.candidates?.[0];
   const metadata = candidate?.groundingMetadata;
@@ -91,7 +103,7 @@ export async function analyzeGrounding(
   const targetSnippets: string[] = [];
   for (const support of supports) {
     const refsTarget = support.chunkIndices.some((idx) =>
-      targetChunkIndices.includes(idx)
+      targetChunkIndices.includes(idx),
     );
     if (refsTarget && support.text) {
       targetSnippets.push(support.text);
@@ -100,11 +112,11 @@ export async function analyzeGrounding(
 
   const totalGroundingWords = supports.reduce(
     (sum, s) => sum + (s.text?.split(/\s+/).length ?? 0),
-    0
+    0,
   );
   const targetGroundingWords = targetSnippets.reduce(
     (sum, s) => sum + s.split(/\s+/).length,
-    0
+    0,
   );
 
   const selectionRate =

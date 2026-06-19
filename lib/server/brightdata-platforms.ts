@@ -6,6 +6,7 @@ import type {
   BrightDataSnapshotRecord,
   BrightDataCitation,
 } from "./sro-types";
+import { fetchWithTimeout } from "./http";
 
 const TRIGGER_URL = "https://api.brightdata.com/datasets/v3/trigger";
 const SNAPSHOT_URL = "https://api.brightdata.com/datasets/v3/snapshot";
@@ -99,7 +100,7 @@ function parseTextFragment(url: string): string {
 
 function parseCitations(
   rawCitations: BrightDataCitation[],
-  targetUrl: string
+  targetUrl: string,
 ): { all: PlatformCitation[]; target: PlatformCitation[] } {
   const all: PlatformCitation[] = [];
   const target: PlatformCitation[] = [];
@@ -137,7 +138,7 @@ function parseCitations(
 
 async function triggerSnapshot(
   platform: PlatformConfig,
-  keyword: string
+  keyword: string,
 ): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("BRIGHT_DATA_KEY is not configured.");
@@ -151,7 +152,7 @@ async function triggerSnapshot(
     },
   ];
 
-  const resp = await fetch(
+  const resp = await fetchWithTimeout(
     `${TRIGGER_URL}?dataset_id=${datasetId}&include_errors=true`,
     {
       method: "POST",
@@ -160,12 +161,15 @@ async function triggerSnapshot(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
-    }
+    },
+    30_000,
   );
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Trigger failed for ${platform.id}: ${resp.status} ${text}`);
+    throw new Error(
+      `Trigger failed for ${platform.id}: ${resp.status} ${text}`,
+    );
   }
 
   const data = await resp.json();
@@ -177,15 +181,17 @@ async function triggerSnapshot(
 }
 
 async function pollSnapshot(
-  snapshotId: string
+  snapshotId: string,
 ): Promise<BrightDataSnapshotRecord[]> {
   const apiKey = getApiKey();
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL));
 
-    const resp = await fetch(`${SNAPSHOT_URL}/${snapshotId}?format=json`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const resp = await fetchWithTimeout(
+      `${SNAPSHOT_URL}/${snapshotId}?format=json`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+      20_000,
+    );
 
     if (resp.status === 200) {
       const text = await resp.text();
@@ -194,10 +200,20 @@ async function pollSnapshot(
         if (Array.isArray(data)) return data;
         if (data.data && Array.isArray(data.data)) return data.data;
       } catch {
+        // NDJSON fallback — parse line by line, skipping any malformed line so
+        // one bad row can't throw out of the catch and crash the poll loop.
         const lines = text
           .split("\n")
-          .filter((l) => l.trim())
-          .map((l) => JSON.parse(l));
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .reduce<BrightDataSnapshotRecord[]>((acc, l) => {
+            try {
+              acc.push(JSON.parse(l));
+            } catch {
+              /* skip malformed line */
+            }
+            return acc;
+          }, []);
         if (lines.length > 0) return lines;
       }
     } else if (resp.status !== 202) {
@@ -212,7 +228,7 @@ async function pollSnapshot(
 export async function scrapePlatform(
   platform: PlatformConfig,
   keyword: string,
-  targetUrl: string
+  targetUrl: string,
 ): Promise<PlatformResult> {
   try {
     const snapshotId = await triggerSnapshot(platform, keyword);
@@ -232,8 +248,7 @@ export async function scrapePlatform(
     }
 
     const record = records[0];
-    const answer =
-      record.answer_text_markdown || record.answer_text || "";
+    const answer = record.answer_text_markdown || record.answer_text || "";
     const rawCitations = record.citations || record.sources || [];
     const { all, target } = parseCitations(rawCitations, targetUrl);
 
@@ -262,10 +277,27 @@ export async function scrapePlatform(
 
 export async function scrapeAllPlatforms(
   keyword: string,
-  targetUrl: string
+  targetUrl: string,
 ): Promise<PlatformResult[]> {
-  const results = await Promise.all(
-    PLATFORMS.map((p) => scrapePlatform(p, keyword, targetUrl))
+  // allSettled (not all): scrapePlatform already catches and returns an error
+  // result, but this is defensive — one platform throwing must never discard
+  // the others' completed results.
+  const settled = await Promise.allSettled(
+    PLATFORMS.map((p) => scrapePlatform(p, keyword, targetUrl)),
   );
-  return results;
+  return settled.map((s, i) =>
+    s.status === "fulfilled"
+      ? s.value
+      : {
+          platform: PLATFORMS[i].id,
+          label: PLATFORMS[i].label,
+          status: "error" as const,
+          answer: "",
+          citations: [],
+          targetUrlCited: false,
+          targetCitations: [],
+          error:
+            s.reason instanceof Error ? s.reason.message : String(s.reason),
+        },
+  );
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fetchWithTimeout } from "./http";
 
 const ProviderSchema = z.enum([
   "chatgpt",
@@ -146,7 +147,8 @@ function extractSourcesFromAnswer(answer: string) {
     "xmlns.com",
   ];
 
-  const assetPathPattern = /\.(js|css|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|mp4|webm|mp3)(\?|$)/i;
+  const assetPathPattern =
+    /\.(js|css|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|mp4|webm|mp3)(\?|$)/i;
 
   const junkPathFragments = [
     "/signals/",
@@ -169,7 +171,11 @@ function extractSourcesFromAnswer(answer: string) {
         return false;
       }
 
-      if (blockedHostFragments.some((entry) => host === entry || host.endsWith(`.${entry}`))) {
+      if (
+        blockedHostFragments.some(
+          (entry) => host === entry || host.endsWith(`.${entry}`),
+        )
+      ) {
         return false;
       }
 
@@ -237,10 +243,10 @@ function extractSourcesFromAnswer(answer: string) {
 
 function normalizeAnswer(rawRecord: Record<string, unknown>) {
   const answerCandidates = [
-    rawRecord.answer_text,           // Bright Data primary field
-    rawRecord.answer_text_markdown,  // Markdown variant (Perplexity, Grok, Copilot)
-    rawRecord.answer,                // Legacy / fallback
-    rawRecord.response_raw,          // Grok raw response
+    rawRecord.answer_text, // Bright Data primary field
+    rawRecord.answer_text_markdown, // Markdown variant (Perplexity, Grok, Copilot)
+    rawRecord.answer, // Legacy / fallback
+    rawRecord.response_raw, // Grok raw response
     rawRecord.response,
     rawRecord.output,
     rawRecord.result,
@@ -267,8 +273,25 @@ function normalizeAnswer(rawRecord: Record<string, unknown>) {
     if (obj && typeof obj === "object") {
       const record = obj as Record<string, unknown>;
       // Check common text field names
-      for (const key of ["answer_text", "answer_text_markdown", "answer", "response_raw", "response", "output", "result", "text", "content", "message", "body", "summary", "description"]) {
-        if (typeof record[key] === "string" && (record[key] as string).trim().length > 20) {
+      for (const key of [
+        "answer_text",
+        "answer_text_markdown",
+        "answer",
+        "response_raw",
+        "response",
+        "output",
+        "result",
+        "text",
+        "content",
+        "message",
+        "body",
+        "summary",
+        "description",
+      ]) {
+        if (
+          typeof record[key] === "string" &&
+          (record[key] as string).trim().length > 20
+        ) {
           return (record[key] as string).trim();
         }
       }
@@ -305,12 +328,13 @@ async function monitorUntilReady(snapshotId: string) {
   let elapsed = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const monitorRes = await fetch(
+    const monitorRes = await fetchWithTimeout(
       `https://api.brightdata.com/datasets/v3/progress/${snapshotId}`,
       {
         method: "GET",
         headers: withAuthHeaders(),
       },
+      20_000,
     );
 
     if (!monitorRes.ok) {
@@ -330,7 +354,10 @@ async function monitorUntilReady(snapshotId: string) {
     }
 
     // Exponential backoff: 2s → 4s → 8s → 10s (capped)
-    const delay = Math.min(BASE_DELAY * Math.pow(2, Math.floor(attempt / 5)), MAX_DELAY);
+    const delay = Math.min(
+      BASE_DELAY * Math.pow(2, Math.floor(attempt / 5)),
+      MAX_DELAY,
+    );
     elapsed += delay;
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
@@ -341,12 +368,13 @@ async function monitorUntilReady(snapshotId: string) {
 }
 
 async function downloadSnapshot(snapshotId: string) {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://api.brightdata.com/datasets/v3/snapshot/${snapshotId}?format=json`,
     {
       method: "GET",
       headers: withAuthHeaders(),
     },
+    60_000,
   );
 
   if (!response.ok) {
@@ -387,13 +415,14 @@ export async function runAiScraper(
     inputRecord.geolocation = request.country;
   }
 
-  const scrapeResponse = await fetch(
+  const scrapeResponse = await fetchWithTimeout(
     `https://api.brightdata.com/datasets/v3/scrape?dataset_id=${datasetId}&notify=false&include_errors=true&format=json`,
     {
       method: "POST",
       headers: withAuthHeaders(),
       body: JSON.stringify({ input: [inputRecord] }),
     },
+    60_000,
   );
 
   let payload: unknown;
@@ -461,6 +490,18 @@ export async function runAiScraper(
     createdAt: new Date().toISOString(),
   };
 
+  // Bound the cache: drop expired entries (and, if still oversized, the oldest)
+  // so a long-lived process can't leak memory on high-cardinality prompts.
+  if (inMemoryCache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of inMemoryCache)
+      if (v.expiresAt <= now) inMemoryCache.delete(k);
+    while (inMemoryCache.size > 500) {
+      const oldest = inMemoryCache.keys().next().value;
+      if (oldest === undefined) break;
+      inMemoryCache.delete(oldest);
+    }
+  }
   inMemoryCache.set(cacheKey, {
     expiresAt: Date.now() + OUTPUT_CACHE_TTL_MS,
     value: normalized,

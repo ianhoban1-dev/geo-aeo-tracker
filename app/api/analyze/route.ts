@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { fetchWithTimeout } from "@/lib/server/http";
 
 export const runtime = "edge";
 
@@ -15,7 +16,11 @@ const cache = new Map<string, { expiresAt: number; text: string }>();
 export async function POST(req: NextRequest) {
   try {
     const parsed = bodySchema.parse(await req.json());
-    const cacheKey = JSON.stringify({ prompt: parsed.prompt, maxTokens: parsed.maxTokens, temperature: parsed.temperature });
+    const cacheKey = JSON.stringify({
+      prompt: parsed.prompt,
+      maxTokens: parsed.maxTokens,
+      temperature: parsed.temperature,
+    });
 
     if (!parsed.skipCache) {
       const hit = cache.get(cacheKey);
@@ -28,36 +33,46 @@ export async function POST(req: NextRequest) {
 
     const key = process.env.OPENROUTER_KEY;
     if (!key) {
+      // Server misconfiguration, not a client error.
       return NextResponse.json(
-        { error: "Missing OPENROUTER_KEY" },
-        { status: 400 },
+        { error: "LLM analysis is not configured on this deployment." },
+        { status: 503 },
       );
     }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+    const response = await fetchWithTimeout(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.OPENROUTER_MODEL || "moonshotai/kimi-k2.5",
+          messages: [
+            {
+              role: "user",
+              content: parsed.prompt,
+            },
+          ],
+          max_tokens: parsed.maxTokens ?? 900,
+          temperature: parsed.temperature ?? 0.2,
+        }),
       },
-      body: JSON.stringify({
-        model: "moonshotai/kimi-k2.5",
-        messages: [
-          {
-            role: "user",
-            content: parsed.prompt,
-          },
-        ],
-        max_tokens: parsed.maxTokens ?? 900,
-        temperature: parsed.temperature ?? 0.2,
-      }),
-    });
+      60_000,
+    );
 
     if (!response.ok) {
-      const text = await response.text();
+      // Log the upstream body server-side; never forward it (it can carry
+      // provider internals). Return a generic message to the client.
+      const text = await response.text().catch(() => "");
+      console.error(
+        `[analyze] OpenRouter ${response.status}: ${text.slice(0, 500)}`,
+      );
       return NextResponse.json(
-        { error: `OpenRouter request failed (${response.status}): ${text}` },
-        { status: 500 },
+        { error: "LLM analysis failed. Please try again." },
+        { status: 502 },
       );
     }
 
@@ -66,6 +81,16 @@ export async function POST(req: NextRequest) {
     };
 
     const text = payload.choices?.[0]?.message?.content ?? "";
+    // Bound the cache so unique prompts can't grow it without limit.
+    if (cache.size > 500) {
+      const now = Date.now();
+      for (const [k, v] of cache) if (v.expiresAt <= now) cache.delete(k);
+      while (cache.size > 500) {
+        const oldest = cache.keys().next().value;
+        if (oldest === undefined) break;
+        cache.delete(oldest);
+      }
+    }
     cache.set(cacheKey, {
       text,
       expiresAt: Date.now() + 1000 * 60 * 30,
