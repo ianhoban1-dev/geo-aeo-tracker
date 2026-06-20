@@ -176,11 +176,10 @@ const defaultState: AppState = {
   },
   provider: "chatgpt",
   activeProviders: ["chatgpt"],
-  prompt:
-    "What is the strongest value proposition for sovereign AI analytics tools in 2026? Include sources.",
+  prompt: "What are the best tools in your category in 2026? Include sources.",
   customPrompts: [
     {
-      text: "How visible is {brand} versus competitors for enterprise AI analytics tools? Include sources.",
+      text: "How visible is {brand} compared to its competitors? Include sources.",
       tags: [],
     },
     {
@@ -190,16 +189,12 @@ const defaultState: AppState = {
   ],
   personas: "CMO\nSEO Lead\nProduct Marketing Manager\nFounder",
   fanoutPrompts: [],
-  niche: "AI SEO platform for B2B SaaS",
+  niche: "",
   nicheQueries: [],
   cronExpr: "0 */6 * * *",
   githubWorkflow:
-    "name: sovereign-aeo\non:\n  schedule:\n    - cron: '0 */6 * * *'\njobs:\n  track:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci && npm run test:scraper",
-  competitors: [
-    { name: "profound.com", aliases: [], websites: [] },
-    { name: "otterly.ai", aliases: [], websites: [] },
-    { name: "peec.ai", aliases: [], websites: [] },
-  ],
+    "name: geo-aeo-tracker\non:\n  schedule:\n    - cron: '0 */6 * * *'\njobs:\n  track:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci && npm run test:scraper",
+  competitors: [],
   battlecards: [],
   runs: [],
   auditUrl: "https://example.com",

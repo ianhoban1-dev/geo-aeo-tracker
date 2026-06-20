@@ -45,3 +45,6 @@ next-env.d.ts
 
 # project spec (not part of the app)
 guidelines.md
+
+# session handoff notes (auto-generated, not part of the app)
+HANDOFF.md
