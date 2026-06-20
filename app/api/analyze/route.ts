@@ -13,6 +13,8 @@ const bodySchema = z.object({
   maxTokens: z.number().int().min(128).max(8192).optional(),
   temperature: z.number().min(0).max(1.5).optional(),
   skipCache: z.boolean().optional(),
+  // Optional per-request model override (e.g. structured-output tasks).
+  model: z.string().min(1).max(120).optional(),
 });
 
 const cache = new Map<string, { expiresAt: number; text: string }>();
@@ -24,6 +26,7 @@ export async function POST(req: NextRequest) {
       prompt: parsed.prompt,
       maxTokens: parsed.maxTokens,
       temperature: parsed.temperature,
+      model: parsed.model,
     });
 
     if (!parsed.skipCache) {
@@ -53,7 +56,10 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || "moonshotai/kimi-k2.5",
+          model:
+            parsed.model ||
+            process.env.OPENROUTER_MODEL ||
+            "moonshotai/kimi-k2.5",
           messages: [
             {
               role: "user",

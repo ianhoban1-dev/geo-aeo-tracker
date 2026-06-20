@@ -1311,65 +1311,26 @@ Requirements:
         return;
       }
 
-      const exampleJson = JSON.stringify([
-        {
-          competitor: "example.com",
-          sentiment: "positive",
-          summary: "Strong brand presence with frequent citations.",
-          sections: [
-            {
-              heading: "Strengths",
-              points: ["High domain authority", "Frequent AI citations"],
-            },
-            { heading: "Weaknesses", points: ["Limited product range"] },
-            {
-              heading: "Pricing",
-              points: ["Premium tier: $99/mo", "Free plan available"],
-            },
-            {
-              heading: "AI Visibility",
-              points: ["Mentioned in 8/10 tested prompts"],
-            },
-          ],
-        },
-      ]);
-
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `${brandCtx}You are an AI search visibility analyst. Analyze how AI models (ChatGPT, Perplexity, Gemini, Copilot, Google AI, Grok) likely perceive each of these competitors: ${competitorList.join(", ")}.
-
-For EACH competitor, provide a JSON object with:
-- "competitor": the name exactly as given
-- "sentiment": one of "positive", "neutral", or "negative" based on likely AI recommendation tone
-- "summary": 2-3 sentences overview
-- "sections": an array of objects with "heading" (string) and "points" (string[]) covering:
-  * "Strengths" — what the competitor does well in AI visibility
-  * "Weaknesses" — gaps or disadvantages
-  * "Pricing Insights" — known pricing tiers or cost perception
-  * "AI Visibility" — how often/prominently they appear in AI responses
-  * "Key Differentiators" — what sets them apart
-
-Return ONLY a valid JSON array. No markdown fences. No extra text. Example format:
-${exampleJson}
-
-Now analyze all ${competitorList.length} competitors:`,
-          maxTokens: Math.max(
-            2000,
-            Math.min(4096, 500 * competitorList.length),
-          ),
-          temperature: 0.3,
-          skipCache: true,
-        }),
+      const exampleJson = JSON.stringify({
+        competitor: "example.com",
+        sentiment: "positive",
+        summary: "Strong brand presence with frequent citations.",
+        sections: [
+          {
+            heading: "Strengths",
+            points: ["High domain authority", "Frequent AI citations"],
+          },
+          { heading: "Weaknesses", points: ["Limited product range"] },
+          {
+            heading: "Pricing",
+            points: ["Premium tier: $99/mo", "Free plan available"],
+          },
+          {
+            heading: "AI Visibility",
+            points: ["Mentioned in 8/10 tested prompts"],
+          },
+        ],
       });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Battlecard generation failed");
-
-      const text = String(data.text ?? "").trim();
-
-      let parsed: Battlecard[] | null = null;
 
       const normalizeBattlecards = (arr: unknown): Battlecard[] => {
         if (!Array.isArray(arr)) return [];
@@ -1416,71 +1377,107 @@ Now analyze all ${competitorList.length} competitors:`,
         return mapped.filter((entry): entry is Battlecard => entry !== null);
       };
 
-      const parseCandidate = (candidate: string): Battlecard[] => {
-        try {
-          return normalizeBattlecards(JSON.parse(candidate));
-        } catch {
-          return [];
-        }
-      };
-
-      const direct = parseCandidate(text);
-      if (direct.length > 0) {
-        parsed = direct;
-      }
-
-      if (!parsed) {
-        const noFence = text
+      // Parse a single competitor object out of an LLM response (handles fences
+      // and surrounding prose), normalizing via the array path above.
+      const parseOne = (raw: string, name: string): Battlecard => {
+        const tryObj = (s: string): Battlecard | null => {
+          try {
+            const cards = normalizeBattlecards([JSON.parse(s)]);
+            return cards[0] ?? null;
+          } catch {
+            return null;
+          }
+        };
+        const noFence = raw
           .replace(/```json\s*/gi, "")
           .replace(/```/g, "")
           .trim();
-        const fromNoFence = parseCandidate(noFence);
-        if (fromNoFence.length > 0) parsed = fromNoFence;
-      }
+        let card = tryObj(noFence) ?? tryObj(raw);
+        if (!card) {
+          const start = raw.indexOf("{");
+          const end = raw.lastIndexOf("}");
+          if (start >= 0 && end > start)
+            card = tryObj(raw.slice(start, end + 1));
+        }
+        if (card) return { ...card, competitor: name };
+        const snippet = raw.replace(/[#*`]/g, "").trim().slice(0, 220);
+        return {
+          competitor: name,
+          sentiment: "neutral",
+          summary:
+            snippet ||
+            "AI could not generate a structured analysis for this competitor.",
+        };
+      };
 
-      if (!parsed) {
-        const start = text.indexOf("[");
-        if (start >= 0) {
-          for (let i = text.length - 1; i > start; i -= 1) {
-            if (text[i] !== "]") continue;
-            const candidate = text.slice(start, i + 1);
-            const maybe = parseCandidate(candidate);
-            if (maybe.length > 0) {
-              parsed = maybe;
-              break;
-            }
+      // One small, fast request per competitor. A single combined request for
+      // all competitors is large enough to exceed the LLM/serverless time limits
+      // and abort; per-competitor calls stay well within them. The model
+      // occasionally returns an empty completion, so retry once before giving up.
+      const attemptOne = async (name: string): Promise<Battlecard | null> => {
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `${brandCtx}You are an AI search visibility analyst. Analyze how AI models (ChatGPT, Perplexity, Gemini, Copilot, Google AI, Grok) likely perceive the competitor "${name}".
+
+Return ONE JSON object with:
+- "competitor": "${name}"
+- "sentiment": one of "positive", "neutral", or "negative"
+- "summary": 2-3 sentence overview
+- "sections": an array of {"heading": string, "points": string[]} covering Strengths, Weaknesses, Pricing Insights, AI Visibility, and Key Differentiators
+
+Return ONLY the JSON object. No markdown fences. No extra text. Example format:
+${exampleJson}`,
+            // Gemini Flash is fast and reliable at structured JSON; the default
+            // model returns empty/unparseable output for this task too often.
+            model: "google/gemini-2.5-flash",
+            maxTokens: 1300,
+            temperature: 0.3,
+            skipCache: true,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(data.error || "Battlecard generation failed");
+        const raw = String(data.text ?? "").trim();
+        if (!raw) return null; // empty completion — signal a retry
+        const card = parseOne(raw, name);
+        // A card with sections parsed is "good"; otherwise let the caller retry.
+        return card.sections && card.sections.length > 0 ? card : null;
+      };
+
+      const buildOne = async (name: string): Promise<Battlecard> => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const card = await attemptOne(name);
+            if (card) return card;
+          } catch {
+            /* fall through to retry / fallback */
           }
         }
-      }
+        return {
+          competitor: name,
+          sentiment: "neutral",
+          summary:
+            "Could not generate a structured analysis for this competitor. Try again.",
+        };
+      };
 
-      // Fallback: use raw text split by competitor names
-      if (!parsed || parsed.length === 0) {
-        parsed = competitorList.map((name) => {
-          // Try to find a section about this competitor in the raw text
-          const namePattern = new RegExp(
-            name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-            "i",
-          );
-          const idx = text.search(namePattern);
-          const snippet =
-            idx >= 0
-              ? text
-                  .slice(idx, idx + 300)
-                  .replace(/[#*`]/g, "")
-                  .trim()
-              : "";
-          return {
-            competitor: name,
-            sentiment: "neutral" as const,
-            summary:
-              snippet ||
-              `AI could not generate structured analysis. Raw response: ${text.slice(0, 200)}`,
-          };
-        });
-      }
+      const settled = await Promise.allSettled(competitorList.map(buildOne));
+      const parsed: Battlecard[] = settled.map((r, i) =>
+        r.status === "fulfilled"
+          ? r.value
+          : {
+              competitor: competitorList[i],
+              sentiment: "neutral",
+              summary:
+                "Battlecard generation failed for this competitor. Try again.",
+            },
+      );
 
-      setState((prev) => ({ ...prev, battlecards: parsed! }));
-      setMessage(`Battlecards ready for ${parsed!.length} competitors.`);
+      setState((prev) => ({ ...prev, battlecards: parsed }));
+      setMessage(`Battlecards ready for ${parsed.length} competitors.`);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Failed building battlecards.",
