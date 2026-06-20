@@ -149,8 +149,8 @@ Next.js 16.1 + Turbopack
 ### Install & Run
 
 ```bash
-git clone https://github.com/danishashko/sovereign-aeo-tracker.git
-cd sovereign-aeo-tracker
+git clone https://github.com/danishashko/geo-aeo-tracker.git
+cd geo-aeo-tracker
 npm install
 ```
 
@@ -172,6 +172,15 @@ OPENROUTER_KEY=your_openrouter_api_key
 
 # Gemini API (powers Gemini Grounding in SRO Analysis)
 GEMINI_API_KEY=your_gemini_api_key
+
+# Bright Data zones for the SRO pipeline (SERP + Web Unlocker).
+# Use your own zone names from the Bright Data dashboard.
+BRIGHT_DATA_SERP_ZONE=your_serp_zone
+BRIGHT_DATA_UNLOCKER_ZONE=your_web_unlocker_zone
+
+# Optional: override the OpenRouter model used by /api/analyze,
+# /api/sro-analyze, and /api/site-context (default: kimi-k2.5 / gemini-2.5-flash).
+# OPENROUTER_MODEL=google/gemini-2.5-flash
 ```
 
 ```bash
@@ -192,7 +201,7 @@ npm run lint            # ESLint
 
 > ✅ **The deploy button launches a fully functional production instance.** You'll be prompted for your API keys during setup. No demo mode, no restrictions.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdanishashko%2Fsovereign-aeo-tracker&env=BRIGHT_DATA_KEY,BRIGHT_DATA_DATASET_CHATGPT,BRIGHT_DATA_DATASET_PERPLEXITY,BRIGHT_DATA_DATASET_COPILOT,BRIGHT_DATA_DATASET_GEMINI,BRIGHT_DATA_DATASET_GOOGLE_AI,BRIGHT_DATA_DATASET_GROK,OPENROUTER_KEY,GEMINI_API_KEY)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdanishashko%2Fgeo-aeo-tracker&env=BRIGHT_DATA_KEY,BRIGHT_DATA_DATASET_CHATGPT,BRIGHT_DATA_DATASET_PERPLEXITY,BRIGHT_DATA_DATASET_COPILOT,BRIGHT_DATA_DATASET_GEMINI,BRIGHT_DATA_DATASET_GOOGLE_AI,BRIGHT_DATA_DATASET_GROK,BRIGHT_DATA_SERP_ZONE,BRIGHT_DATA_UNLOCKER_ZONE,OPENROUTER_KEY,GEMINI_API_KEY)
 
 1. Click the button above (or run `vercel --prod` from your clone)
 2. Enter your [Bright Data](https://brightdata.com/?utm_source=geo-tracker-os) and [OpenRouter](https://openrouter.ai/) API keys when prompted
@@ -219,7 +228,7 @@ By default, **all your data stays in your browser** (IndexedDB). That's great fo
 1. Create a free project at [supabase.com](https://supabase.com/).
 2. In the Supabase SQL editor, paste and run `supabase/migrations/001_kv_store.sql` from this repo. This creates a single `kv_store` table with RLS enabled.
 3. In Supabase → **Project Settings → API**, grab:
-   - `Project URL` → `SUPABASE_URL`
+   - `Project URL` → `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL` — either is accepted)
    - `service_role` secret key → `SUPABASE_SERVICE_ROLE_KEY`
 4. In Vercel → **Project Settings → Environment Variables**, add:
 
@@ -227,9 +236,17 @@ By default, **all your data stays in your browser** (IndexedDB). That's great fo
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
    NEXT_PUBLIC_CLOUD_STORAGE_ENABLED=true
+
+   # Shared secret that authenticates the cloud sync API. Generate a long
+   # random string (e.g. `openssl rand -hex 24`). REQUIRED when cloud sync is
+   # enabled — without it the /api/state route rejects every request.
+   STATE_SYNC_SECRET=your_long_random_secret
    ```
 
-5. Redeploy. The Project Settings tab will now show a Cloud Sync card.
+5. Redeploy. Open **Project Settings → Cloud Sync**, enable it, and paste the
+   same `STATE_SYNC_SECRET` value into the **Sync passphrase** field. This is
+   what keeps your KV store private: the API denies any request without it, so
+   the secret never ships in the client bundle.
 
 **Free tier caveats** (always check [supabase.com/pricing](https://supabase.com/pricing) for current limits)
 - Free tier includes a generous Postgres database, but projects pause after a week of inactivity on the free plan — first request after a pause may be slow.
