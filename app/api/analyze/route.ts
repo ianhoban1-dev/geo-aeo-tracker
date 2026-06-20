@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
           model:
             parsed.model ||
             process.env.OPENROUTER_MODEL ||
-            "moonshotai/kimi-k2.5",
+            "google/gemini-3.5-flash",
           messages: [
             {
               role: "user",

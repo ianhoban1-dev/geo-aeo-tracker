@@ -1424,9 +1424,9 @@ Return ONE JSON object with:
 
 Return ONLY the JSON object. No markdown fences. No extra text. Example format:
 ${exampleJson}`,
-            // Gemini Flash is fast and reliable at structured JSON; the default
-            // model returns empty/unparseable output for this task too often.
-            model: "google/gemini-2.5-flash",
+            // Pin a reliable structured-output model regardless of any
+            // OPENROUTER_MODEL override the deployer may have set.
+            model: "google/gemini-3.5-flash",
             maxTokens: 1300,
             temperature: 0.3,
             skipCache: true,

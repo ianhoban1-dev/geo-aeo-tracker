@@ -10,8 +10,8 @@ import type {
 } from "./sro-types";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-// google/gemini-2.0-flash-001 was retired on OpenRouter (404 "No endpoints found").
-const MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
+// Gemini Flash is fast + reliable at structured JSON; overridable via env.
+const MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.5-flash";
 const MAX_USER_PROMPT_CHARS = 50_000;
 
 const SYSTEM_PROMPT = `You are an expert SRO (Selection Rate Optimization) analyst. SRO is the discipline of optimizing web content to be selected by AI systems as grounding sources when answering user queries.

@@ -4,6 +4,14 @@ All notable changes to GEO/AEO Tracker are documented here.
 
 ---
 
+## [1.3.1] — 2026-06-20
+
+### 🤖 Default model → Gemini 3.5 Flash
+
+- Switched the default LLM to **`gemini-3.5-flash`** everywhere (verified live on both OpenRouter and the Google Gemini API): the OpenRouter routes (`/api/analyze`, `/api/sro-analyze`, `/api/site-context`, Competitor Battlecards) now default to `google/gemini-3.5-flash`, and the SRO **Gemini Grounding** stage (`lib/server/gemini-grounding.ts`) uses `gemini-3.5-flash`. Faster and stronger at structured output than the previous mix (`kimi-k2.5` / `gemini-2.5-flash`). Still overridable via `OPENROUTER_MODEL`.
+
+---
+
 ## [1.3.0] — 2026-06-20
 
 A security, reliability, and UX hardening release, plus fixes for two features

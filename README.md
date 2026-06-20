@@ -179,8 +179,8 @@ BRIGHT_DATA_SERP_ZONE=your_serp_zone
 BRIGHT_DATA_UNLOCKER_ZONE=your_web_unlocker_zone
 
 # Optional: override the OpenRouter model used by /api/analyze,
-# /api/sro-analyze, and /api/site-context (default: kimi-k2.5 / gemini-2.5-flash).
-# OPENROUTER_MODEL=google/gemini-2.5-flash
+# /api/sro-analyze, and /api/site-context (default: google/gemini-3.5-flash).
+# OPENROUTER_MODEL=google/gemini-3.5-flash
 ```
 
 ```bash
