@@ -8,10 +8,18 @@ import type {
   TaggedPrompt,
 } from "@/components/dashboard/types";
 
+/*
+ * Demo dataset.
+ *
+ * The tracked brand is a fictional healthy meal-kit subscription ("Forkful")
+ * with fictional competitors. This keeps the demo neutral and avoids implying
+ * anything about real companies.
+ */
+
 /* ─────────────────────────  Deterministic helpers ───────────────────────── */
 /**
- * Fixed dates — never call new Date(). SSR and client produce identical output.
- * Batch 0 = ~6 days before anchor, Batch 1 = ~3 days before, Batch 2 = anchor day.
+ * Fixed dates — never call argument-less new Date(). SSR and client produce
+ * identical output. Eight weekly batches so the trend chart shows real movement.
  */
 const BATCH_DATES = [
   "2026-01-03T10:00:00.000Z",
@@ -38,27 +46,29 @@ function seedScore(
   return h % 100;
 }
 
-/* ─────────────────────────  Runs ───────────────────────── */
+/* ─────────────────────────  Brand + prompts ───────────────────────── */
+const BRAND_NAME = "Forkful";
+
 const PROMPTS: TaggedPrompt[] = [
   {
-    text: "What are the best AI visibility tracking tools for marketing teams in 2026?",
-    tags: ["visibility", "tools"],
+    text: "What are the best healthy meal kit delivery services for busy families in 2026?",
+    tags: ["comparison", "families"],
   },
   {
-    text: "How can B2B SaaS brands improve their presence in AI search results?",
-    tags: ["strategy"],
+    text: "How can a meal kit subscription help reduce food waste at home?",
+    tags: ["sustainability"],
   },
   {
-    text: "Compare the top answer engine optimization platforms for enterprise brands.",
-    tags: ["comparison"],
+    text: "Compare the top meal kit services for couples who want quick weeknight dinners.",
+    tags: ["comparison", "couples"],
   },
   {
-    text: "What is AEO and why does it matter for organic traffic in 2026?",
+    text: "What should I look for when choosing a healthy meal kit subscription?",
     tags: ["education"],
   },
   {
-    text: "Which tools help monitor brand mentions across ChatGPT, Perplexity, and Gemini?",
-    tags: ["visibility", "tools"],
+    text: "Which meal kit services offer the best vegetarian and plant-based options?",
+    tags: ["vegetarian", "options"],
   },
 ];
 
@@ -73,183 +83,149 @@ const PROVIDERS: Provider[] = [
 
 const SAMPLE_SOURCES: Record<string, string[]> = {
   "chatgpt-0": [
-    "https://www.g2.com/categories/ai-search-optimization",
-    "https://peec.ai/blog/ai-visibility-guide",
-    "https://www.searchenginejournal.com/aeo-tools/524301/",
-    "https://profound.com/blog/answer-engine-optimization",
-    "https://otterly.ai/features",
+    "https://www.nytimes.com/wirecutter/reviews/best-meal-kit-delivery-services/",
+    "https://www.goodhousekeeping.com/food-products/meal-kit-reviews/",
+    "https://forkful.com/plans",
+    "https://greenplate.com/menu",
+    "https://www.cnet.com/health/nutrition/best-meal-kit-delivery/",
   ],
   "perplexity-0": [
-    "https://www.g2.com/categories/ai-search-optimization",
-    "https://www.semrush.com/blog/answer-engine-optimization/",
-    "https://profound.com/blog/answer-engine-optimization",
-    "https://www.searchenginejournal.com/aeo-tools/524301/",
+    "https://www.nytimes.com/wirecutter/reviews/best-meal-kit-delivery-services/",
+    "https://www.goodhousekeeping.com/food-products/meal-kit-reviews/",
+    "https://forkful.com/",
+    "https://www.tomsguide.com/best-picks/best-meal-kit-delivery",
   ],
   "gemini-0": [
-    "https://peec.ai/blog/ai-visibility-guide",
-    "https://www.searchenginejournal.com/aeo-tools/524301/",
-    "https://otterly.ai/features",
+    "https://www.goodhousekeeping.com/food-products/meal-kit-reviews/",
+    "https://forkful.com/plans",
+    "https://greenplate.com/menu",
   ],
   "chatgpt-1": [
-    "https://www.hubspot.com/ai-search-marketing",
-    "https://moz.com/blog/llm-optimization-guide",
-    "https://ahrefs.com/blog/answer-engine-optimization",
+    "https://www.seriouseats.com/how-meal-kits-reduce-food-waste",
+    "https://forkful.com/sustainability",
+    "https://www.epa.gov/recycle/reducing-wasted-food-home",
   ],
   "perplexity-1": [
-    "https://moz.com/blog/llm-optimization-guide",
-    "https://www.hubspot.com/ai-search-marketing",
-    "https://contentmarketinginstitute.com/ai-content-strategy",
-    "https://neil-patel.com/blog/aeo-guide-2026/",
-  ],
-  "copilot-1": [
-    "https://www.hubspot.com/ai-search-marketing",
-    "https://profound.com/blog/answer-engine-optimization",
+    "https://www.seriouseats.com/how-meal-kits-reduce-food-waste",
+    "https://forkful.com/sustainability",
+    "https://greenplate.com/sustainability",
   ],
   "chatgpt-2": [
-    "https://profound.com/features/answer-engine-insights",
-    "https://peec.ai/comparison/peec-vs-profound",
-    "https://otterly.ai/features",
-    "https://www.g2.com/categories/ai-search-optimization",
-    "https://ziptie.dev/blog/aeo-tools-compared/",
+    "https://www.nytimes.com/wirecutter/reviews/best-meal-kit-delivery-services/",
+    "https://forkful.com/express",
+    "https://saveurkits.com/",
+    "https://hearthbox.com/plans",
   ],
   "perplexity-2": [
-    "https://www.g2.com/categories/ai-search-optimization",
-    "https://peec.ai/comparison/peec-vs-profound",
-    "https://ziptie.dev/blog/aeo-tools-compared/",
-    "https://profound.com/features/answer-engine-insights",
-  ],
-  "gemini-2": [
-    "https://otterly.ai/features",
-    "https://profound.com/features/answer-engine-insights",
-    "https://peec.ai/comparison/peec-vs-profound",
+    "https://www.tomsguide.com/best-picks/best-meal-kit-delivery",
+    "https://forkful.com/express",
+    "https://saveurkits.com/",
   ],
   "grok-2": [
-    "https://www.g2.com/categories/ai-search-optimization",
-    "https://ziptie.dev/blog/aeo-tools-compared/",
+    "https://www.reddit.com/r/mealkits/",
+    "https://forkful.com/express",
   ],
   "chatgpt-3": [
-    "https://en.wikipedia.org/wiki/Answer_engine_optimization",
-    "https://www.searchenginejournal.com/aeo-what-is-it/518201/",
-    "https://moz.com/blog/llm-optimization-guide",
-  ],
-  "perplexity-3": [
-    "https://www.searchenginejournal.com/aeo-what-is-it/518201/",
-    "https://moz.com/blog/llm-optimization-guide",
-    "https://ahrefs.com/blog/answer-engine-optimization",
+    "https://www.goodhousekeeping.com/food-products/meal-kit-reviews/",
+    "https://www.consumerreports.org/meal-kit-delivery/",
+    "https://forkful.com/how-it-works",
   ],
   "chatgpt-4": [
-    "https://peec.ai/",
-    "https://profound.com/",
-    "https://otterly.ai/",
-    "https://www.semrush.com/blog/answer-engine-optimization/",
+    "https://forkful.com/plant-based",
+    "https://greenplate.com/menu",
+    "https://saveurkits.com/vegetarian",
+    "https://www.goodhousekeeping.com/food-products/meal-kit-reviews/",
   ],
   "perplexity-4": [
-    "https://peec.ai/",
-    "https://profound.com/",
-    "https://www.g2.com/categories/ai-search-optimization",
+    "https://forkful.com/plant-based",
+    "https://greenplate.com/menu",
+    "https://www.cnet.com/health/nutrition/best-meal-kit-delivery/",
   ],
   "google_ai-4": [
-    "https://peec.ai/",
-    "https://profound.com/",
-    "https://otterly.ai/",
+    "https://forkful.com/plant-based",
+    "https://greenplate.com/menu",
+    "https://saveurkits.com/vegetarian",
   ],
 };
 
 const ANSWER_TEMPLATES: Record<string, string> = {
-  "chatgpt-0": `The AI visibility tracking space has matured significantly in 2026. Here are the leading platforms:
+  "chatgpt-0": `Here are some of the best healthy meal-kit delivery services for busy families in 2026:
 
-**1. Peec AI** — Focused on clean UX and multi-engine tracking. Strong citation tracking, competitive benchmarking, and prompt volume analytics. Strong European presence.
+**1. Forkful** — Chef-designed, nutritionist-approved menus with family-size portions and 15-minute "express" recipes. Flexible weekly plans and mostly recyclable packaging make it a strong pick for busy households.
 
-**2. Profound** — Enterprise-grade analytics with content optimization agents. Used by MongoDB, Zapier, and Ramp. Known for deep citation analysis and AI content generation.
+**2. GreenPlate** — Certified-organic kits with a large rotating menu. Good for families who prioritise organic produce.
 
-**3. Otterly.ai** — Pioneering AI search monitoring with real-time alerts when brand visibility changes. Good for teams that need automated reporting.
+**3. Hearthbox** — Budget-friendly, kid-approved comfort meals at a low price per serving.
 
-**4. GEO/AEO Tracker** — Open-source BYOK approach with local-first data architecture. Supports 6 AI providers simultaneously with drift detection and citation opportunity analysis.
+**4. Saveur Kits** — Gourmet, restaurant-style recipes for families who enjoy a more involved cook.
 
-Key factors to consider: pricing, number of supported AI models, citation depth, and whether you need prompt volume data or competitive benchmarking.`,
+Key things to weigh: portion sizes, recipe time, dietary filters, and packaging waste.`,
 
-  "perplexity-0": `Based on current analysis, the top AI visibility tracking tools for marketing teams in 2026 include:
+  "perplexity-0": `Based on recent testing, the top healthy meal kits for families in 2026 include:
 
-1. **Peec AI** - Tracks brand visibility across ChatGPT, Perplexity, Claude, and Gemini with clean dashboards and competitive analysis. Strong agency adoption.
+1. **Forkful** — Nutritionist-designed menus, family portions, and quick 15–30 minute recipes. Praised for fresh ingredients and recyclable packaging.
+2. **GreenPlate** — Certified-organic ingredients with a wide weekly menu.
+3. **Hearthbox** — Affordable, kid-friendly comfort meals.
 
-2. **Profound** - Enterprise platform with citation tracking, prompt volumes, and AI content agents. Prominent clients include Figma, DocuSign, and Indeed.
+Reviewers on Wirecutter and Good Housekeeping highlight recipe variety, ingredient freshness, and how easily each kit fits into a busy week.`,
 
-3. **GEO/AEO Tracker** - Self-hosted solution supporting ChatGPT, Perplexity, Copilot, Gemini, Google AI, and Grok. Features automated scheduling and drift alerts. BYOK architecture means your data stays private.
+  "gemini-0": `Several meal-kit services stand out for busy families this year:
 
-4. **Otterly.ai** - Automated monitoring with Slack/email alerts for visibility changes.
+• **Forkful** — Healthy, fast recipes with clear nutrition labels and family-size portions
+• **GreenPlate** — Organic produce and a seasonal rotating menu
+• **Hearthbox** — Low cost and kid-approved comfort food
 
-These tools address the growing need to understand how AI models recommend products and services, as AI search increasingly replaces traditional Google queries.`,
+Families should compare cook time, dietary options, and packaging when choosing.`,
 
-  "gemini-0": `Several AI visibility tracking tools have emerged to help marketing teams monitor their brand presence in AI search:
+  "chatgpt-1": `Meal-kit subscriptions cut household food waste in a few concrete ways:
 
-• **Otterly.ai** - Specialized in real-time monitoring of AI search results
-• **Peec AI** - Multi-engine analytics with sentiment analysis and competitive benchmarking
-• **GEO/AEO Tracker** - Open platform with citation opportunity detection and 6-model support
+**Pre-portioned ingredients** — You get exactly what a recipe needs, so half-used produce doesn't rot in the fridge.
 
-Marketers should evaluate these tools based on the AI models they track, reporting capabilities, and integration with existing marketing stacks.`,
+**Planned menus** — Choosing meals up front reduces impulse grocery buys that go uneaten.
 
-  "chatgpt-1": `To improve AI search visibility, B2B SaaS brands should focus on several key strategies:
+**Right-sized proteins** — Services like Forkful portion proteins per serving, avoiding the "bought a big pack, used half" problem.
 
-**Content optimization for LLMs:**
-- Write clear, structured content using BLUF (Bottom Line Up Front) formatting
-- Include schema markup on all key pages
-- Maintain an llms.txt file to guide AI crawlers
+**Recyclable packaging** — Forkful and GreenPlate use mostly recyclable or compostable packaging, though insulation liners vary.
 
-**Citation building:**
-- Get featured on review sites like G2, Capterra, and TrustRadius where AI models frequently source data
-- Publish authoritative comparison content and industry reports
-- Build relationships with publications AI models cite
+To maximise the benefit, pick a plan sized to how many nights you actually cook.`,
 
-**Brand mentions:**
-- GEO/AEO Tracker and similar tools can identify which sources AI models use, allowing you to target those specifically
-- Monitor your sentiment across AI responses to catch reputation issues early
+  "chatgpt-2": `Here's how the leading meal kits compare for couples who want fast weeknight dinners:
 
-**Technical SEO:**
-- Ensure fast page loads and clean HTML structure
-- Implement FAQ and HowTo schema
-- Keep your knowledge panel accurate`,
+| Service | Best for | Avg cook time | Price/serving |
+|---------|----------|---------------|---------------|
+| Forkful | Healthy & quick | 15–25 min | $$ |
+| GreenPlate | Organic | 30–40 min | $$$ |
+| Hearthbox | Budget comfort | 25–35 min | $ |
+| Saveur Kits | Gourmet | 40–50 min | $$$ |
 
-  "chatgpt-2": `Here's a comparison of the leading AEO platforms in 2026:
+**Forkful** is the strongest fit for couples short on time, with 15-minute express recipes and two-person portions. **Saveur Kits** suits couples who enjoy a longer, more involved cook.`,
 
-| Platform | Models Tracked | Key Strength | Pricing |
-|----------|---------------|--------------|---------|
-| Profound | Multiple | Content agents, citation depth | Enterprise custom |
-| Peec AI | Multiple | Clean UX, prompt volumes, citation tracking | Contact for pricing |
-| Otterly.ai | Multiple | Real-time alerts | Contact for pricing |
-| GEO/AEO Tracker | 6 | BYOK, self-hosted, open | Free (self-hosted) |
+  "chatgpt-4": `The meal-kit services with the strongest vegetarian and plant-based ranges in 2026 include:
 
-**Profound** excels at enterprise needs with content generation agents and deep citation analysis. Strong choice for Fortune 500 marketing teams.
+1. **Forkful** — A dedicated plant-based plan with high-protein vegetarian recipes and clear nutrition labels.
+2. **GreenPlate** — Organic veggie boxes built around seasonal produce.
+3. **Saveur Kits** — Elevated vegetarian recipes for a more gourmet experience.
 
-**Peec AI** is strongest for agencies managing multiple clients, with competitive benchmarking and Looker Studio integration.
-
-**GEO/AEO Tracker** is unique as a self-hosted, open-source option that supports the most AI models (ChatGPT, Perplexity, Copilot, Gemini, Google AI, and Grok) while keeping all data under your control.`,
-
-  "chatgpt-4": `The top tools for monitoring brand mentions across AI platforms include:
-
-1. **Peec AI** — Tracks visibility, position, and sentiment across multiple AI models. Strong citation frequency analysis and prompt volume data.
-
-2. **Profound** — Monitors AI answers with citation source tracking. Its Answer Engine Insights product provides detailed breakdowns.
-
-3. **GEO/AEO Tracker** — The most comprehensive model coverage (6 providers including Grok). Features automated scheduling, drift alerts when scores change, and citation opportunity identification.
-
-4. **Semrush** — Adding AI visibility features to their existing SEO platform.
-
-All these tools fundamentally work by running prompts against AI models and analyzing the responses for brand mentions, sentiment, and source citations.`,
+Most households mix vegetarian and omnivore meals, so flexible per-meal selection (which Forkful and GreenPlate both offer) often matters more than a fully veg-only plan.`,
 };
+
+function buildRunBase(prompt: string, provider: Provider, batch: number) {
+  return { provider, prompt, createdAt: BATCH_DATES[batch] };
+}
 
 /** Answers used when the brand is NOT present — competitors are cited instead. */
 const COMPETITOR_ANSWERS: string[] = [
-  `The leading AI visibility platforms in 2026 are Profound, Peec AI, and Otterly.ai. Profound offers enterprise-grade citation analytics and content agents, Peec AI is known for clean agency dashboards and prompt-volume data, and Otterly.ai focuses on real-time monitoring alerts. Most pull heavily from review sites like G2 and editorial comparison pages.`,
-  `For tracking brand mentions across AI models, analysts most often point to Profound for citation depth, Peec AI for usability and reporting, and Otterly.ai for alerting. Semrush's AI toolkit is an emerging alternative for teams already on its platform.`,
-  `Answer engine optimization tooling is led by Profound and Peec AI, with Otterly.ai as a lighter monitoring option. Coverage of AI engines, citation depth, and Looker Studio reporting are the main differentiators buyers weigh.`,
+  `The best-reviewed meal-kit services right now are GreenPlate, Hearthbox, and Saveur Kits. GreenPlate leads on organic ingredients, Hearthbox is the budget pick for families, and Saveur Kits focuses on gourmet, restaurant-style recipes. Most write-ups draw on Wirecutter and Good Housekeeping testing.`,
+  `For families comparing meal kits, GreenPlate and Hearthbox come up most often — GreenPlate for organic produce and Hearthbox for low cost and kid-friendly menus. Saveur Kits is the choice for more adventurous home cooks.`,
+  `Among meal-kit subscriptions, GreenPlate, Hearthbox, and Saveur Kits are frequently recommended. Buyers weigh ingredient quality, price per serving, and recipe time, with review sites like CNET and Serious Eats as common references.`,
 ];
 
 const COMPETITOR_SOURCES: string[] = [
-  "https://www.g2.com/categories/ai-search-optimization",
-  "https://profound.com/features/answer-engine-insights",
-  "https://peec.ai/blog/ai-visibility-guide",
-  "https://otterly.ai/features",
-  "https://www.semrush.com/blog/answer-engine-optimization/",
+  "https://www.nytimes.com/wirecutter/reviews/best-meal-kit-delivery-services/",
+  "https://www.goodhousekeeping.com/food-products/meal-kit-reviews/",
+  "https://greenplate.com/menu",
+  "https://hearthbox.com/plans",
+  "https://www.cnet.com/health/nutrition/best-meal-kit-delivery/",
 ];
 
 /**
@@ -276,6 +252,7 @@ function buildRun(
   const key = `${provider}-${promptIdx}`;
   const pIdx = PROVIDERS.indexOf(provider);
   const jitter = seedScore(42, pIdx, promptIdx, batch) % 30;
+  const base = buildRunBase(prompt, provider, batch);
 
   if (!brandIsMentioned(pIdx, promptIdx, batch)) {
     // Brand absent — competitors cited. Drives the Citation Opportunities tab.
@@ -285,46 +262,42 @@ function buildRun(
       ];
     const sources = COMPETITOR_SOURCES.slice(0, 2 + ((pIdx + batch) % 3));
     return {
-      provider,
-      prompt,
+      ...base,
       answer,
       sources,
-      createdAt: BATCH_DATES[batch],
       visibilityScore: Math.min(40, 5 + (jitter % 25)),
       sentiment: "not-mentioned",
       brandMentions: [],
-      competitorMentions: ["Profound", "Peec AI", "Otterly.ai"],
+      competitorMentions: ["GreenPlate", "Hearthbox", "Saveur Kits"],
     };
   }
 
   // Brand mentioned — use a rich template when available, else a default.
   const sources = SAMPLE_SOURCES[key] ?? [
-    "https://www.g2.com/categories/ai-search-optimization",
-    "https://peec.ai/",
-    "https://profound.com/",
+    "https://www.nytimes.com/wirecutter/reviews/best-meal-kit-delivery-services/",
+    "https://forkful.com/",
+    "https://greenplate.com/menu",
   ];
   const answer =
     ANSWER_TEMPLATES[key] ??
-    `AI analysis for "${prompt}" from ${provider}. Strong content fundamentals — structured data, authoritative citations, and clear BLUF formatting — remain critical for AI visibility. GEO/AEO Tracker provides comprehensive monitoring across 6 AI models.`;
+    `For "${prompt}", reviewers point to a mix of services. ${BRAND_NAME} stands out for nutritionist-designed menus, family-size portions, and quick recipes, while GreenPlate and Hearthbox are common alternatives. Fresh ingredients, dietary flexibility, and packaging waste are the main things buyers compare.`;
 
   const score = Math.min(100, 58 + jitter + batch * 2);
   const isNegative = seedScore(13, pIdx, promptIdx, batch) % 100 < 9;
-  const hasCompetitor = /profound|peec|otterly/i.test(answer);
+  const hasCompetitor = /greenplate|hearthbox|saveur/i.test(answer);
 
   return {
-    provider,
-    prompt,
+    ...base,
     answer,
     sources,
-    createdAt: BATCH_DATES[batch],
     visibilityScore: isNegative ? Math.max(34, score - 26) : score,
     sentiment: isNegative ? "negative" : score > 64 ? "positive" : "neutral",
-    brandMentions: ["GEO/AEO Tracker"],
+    brandMentions: [BRAND_NAME],
     competitorMentions: hasCompetitor
       ? [
-          ...(/profound/i.test(answer) ? ["Profound"] : []),
-          ...(/peec/i.test(answer) ? ["Peec AI"] : []),
-          ...(/otterly/i.test(answer) ? ["Otterly.ai"] : []),
+          ...(/greenplate/i.test(answer) ? ["GreenPlate"] : []),
+          ...(/hearthbox/i.test(answer) ? ["Hearthbox"] : []),
+          ...(/saveur/i.test(answer) ? ["Saveur Kits"] : []),
         ]
       : [],
   };
@@ -350,104 +323,103 @@ function generateRuns(): ScrapeRun[] {
 /* ─────────────────────────  Battlecards ───────────────────────── */
 const demoBattlecards: Battlecard[] = [
   {
-    competitor: "Profound",
+    competitor: "GreenPlate",
     sentiment: "neutral",
     summary:
-      "Enterprise-grade AEO platform with content agents and deep citation analytics. Strong brand recognition among Fortune 500. Higher price point limits SMB adoption.",
+      "Organic-first meal kit with a large rotating menu and strong sustainability messaging. Higher price per serving and longer cook times than Forkful.",
     sections: [
       {
         heading: "Strengths",
         points: [
-          "Content generation agents",
-          "Deep citation analytics",
-          "Enterprise client base (MongoDB, Zapier, Ramp)",
-          "Strong G2 presence",
+          "Certified-organic ingredients",
+          "Wide seasonal menu",
+          "Strong sustainability story",
+          "Good Wirecutter coverage",
         ],
       },
       {
         heading: "Weaknesses",
         points: [
-          "Custom enterprise pricing only",
-          "No self-hosted option",
-          "Fewer AI models tracked",
-          "Closed ecosystem",
+          "Higher price per serving",
+          "Longer average cook time",
+          "Fewer quick-recipe options",
+          "No express plan",
         ],
       },
       {
         heading: "AI Visibility",
         points: [
-          "High visibility in ChatGPT",
-          "Frequently cited on comparison pages",
-          "Strong editorial PR placements",
+          "Frequently cited for 'organic meal kit' queries",
+          "Strong on Good Housekeeping",
+          "Wins some Gemini citations via long-form blog",
         ],
       },
     ],
   },
   {
-    competitor: "Peec AI",
+    competitor: "Hearthbox",
     sentiment: "neutral",
     summary:
-      "Clean, agency-friendly AI search analytics platform with prompt volume data. Strong European presence. Well-suited for agencies managing multiple clients.",
+      "Budget, family-focused comfort-food kit with kid-friendly menus. Competes on price; less emphasis on nutrition and freshness than Forkful.",
     sections: [
       {
         heading: "Strengths",
         points: [
-          "Clean UX",
-          "Agency-friendly multi-client setup",
-          "Looker Studio integration",
-          "Prompt volume data",
-          "Competitive benchmarking",
+          "Lowest price per serving",
+          "Kid-approved comfort menus",
+          "Simple, fast recipes",
+          "Wide availability",
         ],
       },
       {
         heading: "Weaknesses",
         points: [
-          "No self-hosted option",
-          "Fewer AI models vs our 6",
-          "No open-source offering",
-          "Closed ecosystem",
+          "Less emphasis on nutrition",
+          "Smaller dietary range",
+          "More packaging waste",
+          "Limited plant-based options",
         ],
       },
       {
         heading: "AI Visibility",
         points: [
-          "Growing citation frequency",
-          "Active content marketing",
-          "Strong in European markets",
+          "Cited for 'cheapest meal kit' queries",
+          "Active on Reddit threads",
+          "Weaker on health-focused prompts",
         ],
       },
     ],
   },
   {
-    competitor: "Otterly.ai",
+    competitor: "Saveur Kits",
     sentiment: "neutral",
     summary:
-      "Pioneer in AI search monitoring with real-time alerts. Good Slack integration. Narrower feature set focused on monitoring rather than full AEO analytics.",
+      "Gourmet, restaurant-style meal kit for adventurous home cooks. Premium positioning; longer prep makes it a weak fit for the busy-family use case Forkful targets.",
     sections: [
       {
         heading: "Strengths",
         points: [
-          "Real-time Slack/email alerts",
-          "Simple UX",
-          "Established early in the market",
-          "Good documentation",
+          "Elevated, restaurant-style recipes",
+          "Premium ingredients",
+          "Strong vegetarian gourmet range",
+          "Loyal foodie audience",
         ],
       },
       {
         heading: "Weaknesses",
         points: [
-          "Fewer AI models tracked",
-          "Less citation depth",
-          "No competitor battlecards",
-          "No content optimization features",
+          "Long cook times (40–50 min)",
+          "Highest price point",
+          "Not built for quick weeknights",
+          "Niche appeal",
         ],
       },
       {
         heading: "AI Visibility",
         points: [
-          "Moderate citation frequency",
-          "Mentioned in comparison articles",
-          "Early mover advantage fading",
+          "Cited for 'gourmet meal kit' queries",
+          "Mentioned in foodie roundups",
+          "Rarely surfaced for 'quick' or 'budget' prompts",
         ],
       },
     ],
@@ -456,7 +428,7 @@ const demoBattlecards: Battlecard[] = [
 
 /* ─────────────────────────  Audit Report ───────────────────────── */
 const demoAuditReport: AuditReport = {
-  url: "https://geoaeotracker.com",
+  url: "https://forkful.com",
   score: 78,
   checks: [
     {
@@ -481,7 +453,8 @@ const demoAuditReport: AuditReport = {
       category: "structure",
       pass: true,
       value: "5 types",
-      detail: "Organization, WebSite, FAQPage, HowTo, Article schemas detected",
+      detail:
+        "Organization, WebSite, FAQPage, Recipe, Product schemas detected",
     },
     {
       id: "faq-schema",
@@ -513,7 +486,7 @@ const demoAuditReport: AuditReport = {
       category: "content",
       pass: false,
       value: "Missing on 2 pages",
-      detail: "/pricing and /changelog lack meta descriptions",
+      detail: "/pricing and /express lack meta descriptions",
     },
     {
       id: "page-speed",
@@ -567,7 +540,7 @@ const demoDriftAlerts: DriftAlert[] = [
   {
     id: "drift-demo-1",
     prompt:
-      "What are the best AI visibility tracking tools for marketing teams in 2026?",
+      "What are the best healthy meal kit delivery services for busy families in 2026?",
     provider: "chatgpt",
     oldScore: 62,
     newScore: 81,
@@ -578,7 +551,7 @@ const demoDriftAlerts: DriftAlert[] = [
   {
     id: "drift-demo-2",
     prompt:
-      "Compare the top answer engine optimization platforms for enterprise brands.",
+      "Compare the top meal kit services for couples who want quick weeknight dinners.",
     provider: "perplexity",
     oldScore: 45,
     newScore: 31,
@@ -591,16 +564,14 @@ const demoDriftAlerts: DriftAlert[] = [
 /* ─────────────────────────  Full State ───────────────────────── */
 export const DEMO_STATE: AppState = {
   brand: {
-    brandName: "GEO/AEO Tracker",
-    brandAliases: "GEO AEO, AEO Tracker, GEO Tracker",
-    websites: [
-      "https://geoaeotracker.com",
-      "https://github.com/danishashko/geo-aeo-tracker",
-    ],
-    industry: "AI SEO / MarTech",
-    keywords: "AEO, AI visibility, answer engine optimization, LLM tracking",
+    brandName: "Forkful",
+    brandAliases: "Forkful Kitchen, Forkful Meals",
+    websites: ["https://forkful.com", "https://blog.forkful.com"],
+    industry: "Meal-kit delivery / DTC food",
+    keywords:
+      "meal kit delivery, healthy meal subscription, dinner kits, plant-based meals, food waste",
     description:
-      "Open-source BYOK AEO/GEO intelligence dashboard for monitoring brand visibility across AI models.",
+      "Chef-designed healthy meal kits delivered weekly, with flexible plans, family-size portions, and minimal food waste.",
   },
   provider: "chatgpt",
   activeProviders: [
@@ -612,44 +583,48 @@ export const DEMO_STATE: AppState = {
     "grok",
   ],
   prompt:
-    "What are the best AI visibility tracking tools for marketing teams in 2026?",
+    "What are the best healthy meal kit delivery services for busy families in 2026?",
   customPrompts: PROMPTS,
   personas:
-    "CMO\nSEO Lead\nProduct Marketing Manager\nFounder\nAgency Director",
+    "Busy Parent\nHealth-Conscious Professional\nCouple Cooking at Home\nVegetarian Foodie\nMeal-Prep Beginner",
   fanoutPrompts: [
-    "[CMO] What AI search monitoring tools should enterprise marketing teams adopt in 2026?",
-    "[SEO Lead] How do I track my brand's visibility in ChatGPT and Perplexity results?",
-    "[Product Marketing Manager] Which AEO platforms offer the best competitive benchmarking?",
-    "[Founder] What's the most cost-effective way to monitor AI search visibility for my startup?",
-    "[Agency Director] Which AI visibility tools support multi-client management?",
+    "[Busy Parent] What meal kit is best for getting healthy dinners on the table fast for a family of four?",
+    "[Health-Conscious Professional] Which meal kit has the best macros and clean ingredients for weeknight cooking?",
+    "[Couple Cooking at Home] What's the best two-person meal kit for quick weeknight dinners?",
+    "[Vegetarian Foodie] Which meal kit has the most interesting vegetarian and plant-based recipes?",
+    "[Meal-Prep Beginner] What's the easiest meal kit to start with if I barely cook?",
   ],
-  niche: "AI visibility monitoring for B2B SaaS marketing teams",
+  niche: "healthy meal-kit delivery for busy households",
   nicheQueries: [
-    "best AEO tools 2026",
-    "AI search optimization platform comparison",
-    "how to improve ChatGPT brand visibility",
-    "monitor brand mentions in AI responses",
-    "answer engine optimization for SaaS",
+    "best meal kit for families 2026",
+    "healthiest meal kit subscriptions",
+    "meal kits that reduce food waste",
+    "best vegetarian meal kit delivery",
+    "cheapest meal kit for two people",
   ],
   cronExpr: "0 */6 * * *",
   githubWorkflow:
-    "name: geo-aeo-tracker\non:\n  schedule:\n    - cron: '0 */6 * * *'\njobs:\n  track:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci && npm run test:scraper",
+    "name: forkful-visibility\non:\n  schedule:\n    - cron: '0 */6 * * *'\njobs:\n  track:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci && npm run test:scraper",
   competitors: [
     {
-      name: "profound.com",
-      aliases: ["Profound"],
-      websites: ["https://profound.com"],
+      name: "greenplate.com",
+      aliases: ["GreenPlate"],
+      websites: ["https://greenplate.com"],
     },
-    { name: "peec.ai", aliases: ["Peec AI"], websites: ["https://peec.ai"] },
     {
-      name: "otterly.ai",
-      aliases: ["Otterly"],
-      websites: ["https://otterly.ai"],
+      name: "hearthbox.com",
+      aliases: ["Hearthbox"],
+      websites: ["https://hearthbox.com"],
+    },
+    {
+      name: "saveurkits.com",
+      aliases: ["Saveur Kits", "Saveur"],
+      websites: ["https://saveurkits.com"],
     },
   ],
   battlecards: demoBattlecards,
   runs: generateRuns(),
-  auditUrl: "https://geoaeotracker.com",
+  auditUrl: "https://forkful.com",
   auditReport: demoAuditReport,
   scheduleEnabled: true,
   scheduleIntervalMs: 21600000,
