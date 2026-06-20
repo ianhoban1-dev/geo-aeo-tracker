@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { fetchWithTimeout } from "@/lib/server/http";
 
-export const runtime = "edge";
+// Node (not edge): battlecard/large generations exceed the edge duration cap.
+export const runtime = "nodejs";
+// Allow long LLM generations (battlecards request up to ~4k tokens). Vercel
+// honours this up to the plan limit (60s Hobby / 300s Pro).
+export const maxDuration = 120;
 
 const bodySchema = z.object({
   prompt: z.string().min(5),
@@ -60,7 +64,7 @@ export async function POST(req: NextRequest) {
           temperature: parsed.temperature ?? 0.2,
         }),
       },
-      60_000,
+      110_000,
     );
 
     if (!response.ok) {
