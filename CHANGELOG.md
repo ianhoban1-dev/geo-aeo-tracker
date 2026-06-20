@@ -4,6 +4,48 @@ All notable changes to GEO/AEO Tracker are documented here.
 
 ---
 
+## [1.3.0] — 2026-06-20
+
+A security, reliability, and UX hardening release, plus fixes for two features
+that were broken in production (caught by an end-to-end live QA pass).
+
+### 🔒 Security
+
+- **Authenticated the cloud sync API.** `/api/state` now requires a shared secret (`STATE_SYNC_SECRET`, entered once in **Project Settings → Cloud Sync** as a passphrase). Before this, a public deployment with Supabase enabled exposed the entire KV store to anonymous read / write / delete. ⚠️ **Breaking for cloud-sync users only:** set `STATE_SYNC_SECRET` and the passphrase, or sync requests are rejected (local-first mode is unaffected).
+- **SSRF protection** on `/api/audit` (`lib/server/ssrf.ts`) — rejects internal/reserved targets (cloud metadata, localhost, private ranges) and re-validates every redirect hop.
+- **Rate limiting** on all `/api/*` routes (`proxy.ts`) to curb API-cost abuse.
+- **Fixed a data-loss race** where the initial empty state could overwrite stored data during load.
+- **Dependencies:** Next.js 16.1.6 → 16.2.9; cleared the protobufjs RCE and related advisories.
+
+### ⚡ Reliability
+
+- Hard timeouts on every external call (`lib/server/http.ts`).
+- `/api/bulk-sro` stops the SSE pipeline on client disconnect (no more burning API credits after a tab close).
+- Debounced state saves, bounded in-memory caches, NDJSON parse hardening, tightened input validation, and upstream error bodies are no longer leaked to clients.
+
+### 🎨 Design
+
+- **Overview-first dashboard** — lands on a Visibility Analytics overview instead of the prompt table.
+- New **"Visibility by AI engine"** per-model bars.
+- KPI strip + Top Movers scoped to the overview (no longer repeated on every tab); slimmer demo banner; unified color tokens (fixes SRO colors that broke in light mode).
+
+### 🐛 Fixes (found in live QA)
+
+- **SRO Analysis + Site Context were broken in production:** the OpenRouter model `google/gemini-2.0-flash-001` was retired (404 "No endpoints found"). Switched to `google/gemini-2.5-flash` (overridable via `OPENROUTER_MODEL`).
+- **Competitor Battlecards timed out:** the single combined request exceeded the edge/serverless limits. Split into per-competitor parallel requests on the Node runtime, with a reliable structured-output model via a new optional `model` param on `/api/analyze`.
+
+### 🧪 Demo
+
+- Refreshed sample data so the demo exercises every feature: populated Citation Opportunities, a full sentiment mix, an 8-point rising visibility trend, and a seeded SRO Analysis result.
+- Reframed the demo to a neutral example brand (a fictional meal-kit service) and cleared the default competitor list.
+
+### 📝 Docs / Config
+
+- Documented new env vars: `BRIGHT_DATA_SERP_ZONE`, `BRIGHT_DATA_UNLOCKER_ZONE`, `STATE_SYNC_SECRET`, and the optional `OPENROUTER_MODEL`.
+- Fixed stale repo URLs and the live-demo link.
+
+---
+
 ## [1.2.0] — 2026-04-17
 
 ### ✨ New: Optional Supabase cloud persistence
