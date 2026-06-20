@@ -297,7 +297,7 @@ const tabMeta: Record<
 export function SovereignDashboard({
   demoMode = false,
 }: { demoMode?: boolean } = {}) {
-  const [activeTab, setActiveTab] = useState<TabKey>("Prompt Hub");
+  const [activeTab, setActiveTab] = useState<TabKey>("Visibility Analytics");
   const [state, setState] = useState<AppState>(
     demoMode ? DEMO_STATE : defaultState,
   );
@@ -1927,12 +1927,9 @@ Now analyze all ${competitorList.length} competitors:`,
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Demo banner */}
         {demoMode && (
-          <div className="flex shrink-0 items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm">
-            <span>🎯</span>
-            <span>
-              You&apos;re viewing a read-only demo — data is pre-loaded and API
-              calls are disabled
-            </span>
+          <div className="flex shrink-0 items-center justify-center gap-2 border-b border-th-border bg-th-accent-soft px-4 py-1.5 text-xs font-medium text-th-text-accent">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-th-accent" />
+            <span>Read-only demo — sample data, live API calls disabled</span>
           </div>
         )}
         {/* Toolbar */}
@@ -2039,42 +2036,44 @@ Now analyze all ${competitorList.length} competitors:`,
 
         {/* Scrollable body */}
         <main className="flex-1 overflow-y-auto bg-th-bg px-3 py-3 md:px-5 md:py-4">
-          {/* KPI strip */}
-          <section className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiCard label="Total Runs" value={state.runs.length} />
-            <KpiCard
-              label="Avg Visibility"
-              value={
-                state.runs.length > 0
-                  ? `${Math.round(state.runs.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) / state.runs.length)}%`
-                  : "—"
-              }
-              delta={kpiVisibilityDelta}
-              small
-              onInfoClick={() => setShowScoreInfo(!showScoreInfo)}
-            />
-            <KpiCard
-              label="Brand Mentioned"
-              value={
-                state.runs.filter((r) => (r.brandMentions?.length ?? 0) > 0)
-                  .length
-              }
-            />
-            <KpiCard label="Captured Sources" value={totalSources} />
-            <KpiCard label="Citation Opps" value={citationOpportunities} />
-            <KpiCard
-              label="Latest Run"
-              value={
-                latestRun
-                  ? latestRun.createdAt.replace("T", " ").slice(0, 16)
-                  : "—"
-              }
-              small
-            />
-          </section>
+          {/* KPI strip — overview (Visibility Analytics) only */}
+          {activeTab === "Visibility Analytics" && (
+            <section className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiCard label="Total Runs" value={state.runs.length} />
+              <KpiCard
+                label="Avg Visibility"
+                value={
+                  state.runs.length > 0
+                    ? `${Math.round(state.runs.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) / state.runs.length)}%`
+                    : "—"
+                }
+                delta={kpiVisibilityDelta}
+                small
+                onInfoClick={() => setShowScoreInfo(!showScoreInfo)}
+              />
+              <KpiCard
+                label="Brand Mentioned"
+                value={
+                  state.runs.filter((r) => (r.brandMentions?.length ?? 0) > 0)
+                    .length
+                }
+              />
+              <KpiCard label="Captured Sources" value={totalSources} />
+              <KpiCard label="Citation Opps" value={citationOpportunities} />
+              <KpiCard
+                label="Latest Run"
+                value={
+                  latestRun
+                    ? latestRun.createdAt.replace("T", " ").slice(0, 16)
+                    : "—"
+                }
+                small
+              />
+            </section>
+          )}
 
-          {/* ── Movers strip ── */}
-          {movers.length > 0 && (
+          {/* ── Movers strip — overview only ── */}
+          {activeTab === "Visibility Analytics" && movers.length > 0 && (
             <section className="mb-4 rounded-xl border border-th-border bg-th-card p-4">
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-base">📊</span>
@@ -2124,8 +2123,8 @@ Now analyze all ${competitorList.length} competitors:`,
             </section>
           )}
 
-          {/* Scoring explanation */}
-          {showScoreInfo && (
+          {/* Scoring explanation — overview only */}
+          {activeTab === "Visibility Analytics" && showScoreInfo && (
             <section className="mb-4 rounded-xl border border-th-border bg-th-card p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-base font-semibold text-th-text">
@@ -2264,7 +2263,7 @@ function KpiCard({
         )}
       </div>
       <div
-        className={`mt-1 flex items-center gap-1.5 font-semibold text-th-text ${small ? "text-base" : "text-xl"}`}
+        className={`mt-1 flex items-baseline gap-1.5 font-semibold tracking-tight text-th-text ${small ? "text-lg" : "text-3xl"}`}
       >
         {value}
         {delta != null && delta !== 0 && (

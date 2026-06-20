@@ -8,7 +8,21 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ScrapeRun } from "@/components/dashboard/types";
+import {
+  ALL_PROVIDERS,
+  PROVIDER_LABELS,
+  type ScrapeRun,
+} from "@/components/dashboard/types";
+
+// Brand-ish accent per engine, chosen to stay legible in both themes.
+const PROVIDER_COLORS: Record<string, string> = {
+  chatgpt: "#10a37f",
+  perplexity: "#20b8cd",
+  copilot: "#0a84ff",
+  gemini: "#4285f4",
+  google_ai: "#ea8600",
+  grok: "#6b7280",
+};
 
 type VisibilityAnalyticsTabProps = {
   data: Array<{ day: string; visibility: number }>;
@@ -25,7 +39,10 @@ function downloadCsv(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-export function VisibilityAnalyticsTab({ data, runs }: VisibilityAnalyticsTabProps) {
+export function VisibilityAnalyticsTab({
+  data,
+  runs,
+}: VisibilityAnalyticsTabProps) {
   const exportRunsCsv = useCallback(() => {
     const header =
       "Date,Provider,Prompt,Visibility Score,Sentiment,Brand Mentions,Competitor Mentions,Sources Count\n";
@@ -43,13 +60,19 @@ export function VisibilityAnalyticsTab({ data, runs }: VisibilityAnalyticsTabPro
         ].join(","),
       )
       .join("\n");
-    downloadCsv(`aeo-runs-${new Date().toISOString().slice(0, 10)}.csv`, header + rows);
+    downloadCsv(
+      `aeo-runs-${new Date().toISOString().slice(0, 10)}.csv`,
+      header + rows,
+    );
   }, [runs]);
 
   const exportTrendCsv = useCallback(() => {
     const header = "Day,Avg Visibility (%)\n";
     const rows = data.map((d) => `${d.day},${d.visibility}`).join("\n");
-    downloadCsv(`aeo-trend-${new Date().toISOString().slice(0, 10)}.csv`, header + rows);
+    downloadCsv(
+      `aeo-trend-${new Date().toISOString().slice(0, 10)}.csv`,
+      header + rows,
+    );
   }, [data]);
 
   // Sentiment distribution
@@ -62,33 +85,84 @@ export function VisibilityAnalyticsTab({ data, runs }: VisibilityAnalyticsTabPro
     {} as Record<string, number>,
   );
 
-  const avgVisibility =
-    runs.length > 0
-      ? Math.round(runs.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) / runs.length)
+  // Per-engine average visibility, highest first.
+  const byProvider = ALL_PROVIDERS.map((provider) => {
+    const rs = runs.filter((r) => r.provider === provider);
+    const avg = rs.length
+      ? Math.round(
+          rs.reduce((a, r) => a + (r.visibilityScore ?? 0), 0) / rs.length,
+        )
       : 0;
+    return { provider, avg, count: rs.length };
+  })
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.avg - a.avg);
 
   return (
     <div className="space-y-4">
-      {/* Summary metrics */}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-        <div className="rounded-lg border border-th-border bg-th-card px-3 py-2.5">
-          <div className="text-xs uppercase tracking-wider text-th-text-muted">Avg Visibility</div>
-          <div className="mt-0.5 text-xl font-bold text-th-text">{avgVisibility}%</div>
+      {/* Visibility by AI engine */}
+      <div className="rounded-lg border border-th-border bg-th-card p-4">
+        <div className="mb-3 text-xs font-medium uppercase tracking-wider text-th-text-muted">
+          Visibility by AI engine
         </div>
-        {(["positive", "neutral", "negative", "not-mentioned"] as const).map((s) => {
-          const colors: Record<string, string> = {
-            positive: "text-th-success",
-            neutral: "text-th-text-accent",
-            negative: "text-th-danger",
-            "not-mentioned": "text-th-text-muted",
-          };
-          return (
-            <div key={s} className="rounded-lg border border-th-border bg-th-card px-3 py-2.5">
-              <div className="text-xs uppercase tracking-wider text-th-text-muted">{s}</div>
-              <div className={`mt-0.5 text-xl font-bold ${colors[s]}`}>{sentimentCounts[s] || 0}</div>
-            </div>
-          );
-        })}
+        {byProvider.length === 0 ? (
+          <p className="text-sm text-th-text-muted">
+            Run prompts to see how each AI engine ranks your brand.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {byProvider.map(({ provider, avg }) => (
+              <div key={provider} className="flex items-center gap-3">
+                <span className="flex w-28 shrink-0 items-center gap-1.5 text-sm text-th-text">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: PROVIDER_COLORS[provider] }}
+                  />
+                  {PROVIDER_LABELS[provider]}
+                </span>
+                <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-th-card-alt">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full transition-all"
+                    style={{
+                      width: `${avg}%`,
+                      backgroundColor: PROVIDER_COLORS[provider],
+                    }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums text-th-text">
+                  {avg}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Sentiment distribution */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {(["positive", "neutral", "negative", "not-mentioned"] as const).map(
+          (s) => {
+            const colors: Record<string, string> = {
+              positive: "text-th-success",
+              neutral: "text-th-text-accent",
+              negative: "text-th-danger",
+              "not-mentioned": "text-th-text-muted",
+            };
+            return (
+              <div
+                key={s}
+                className="rounded-lg border border-th-border bg-th-card px-3 py-2.5"
+              >
+                <div className="text-xs uppercase tracking-wider text-th-text-muted">
+                  {s}
+                </div>
+                <div className={`mt-0.5 text-xl font-bold ${colors[s]}`}>
+                  {sentimentCounts[s] || 0}
+                </div>
+              </div>
+            );
+          },
+        )}
       </div>
 
       {/* Chart */}
@@ -100,9 +174,18 @@ export function VisibilityAnalyticsTab({ data, runs }: VisibilityAnalyticsTabPro
         <div className="h-80 w-full rounded-lg border border-th-border bg-th-card-alt p-2">
           <ResponsiveContainer>
             <LineChart data={data}>
-              <CartesianGrid stroke="var(--th-chart-grid)" strokeDasharray="3 3" />
-              <XAxis dataKey="day" tick={{ fill: "var(--th-chart-axis)", fontSize: 12 }} />
-              <YAxis domain={[0, 100]} tick={{ fill: "var(--th-chart-axis)", fontSize: 12 }} />
+              <CartesianGrid
+                stroke="var(--th-chart-grid)"
+                strokeDasharray="3 3"
+              />
+              <XAxis
+                dataKey="day"
+                tick={{ fill: "var(--th-chart-axis)", fontSize: 12 }}
+              />
+              <YAxis
+                domain={[0, 100]}
+                tick={{ fill: "var(--th-chart-axis)", fontSize: 12 }}
+              />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "var(--th-card)",
