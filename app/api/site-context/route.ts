@@ -87,7 +87,7 @@ ${snippet}`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-001",
+          model: process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash",
           messages: [{ role: "user", content: prompt }],
           max_tokens: 1000,
           temperature: 0.1,

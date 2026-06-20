@@ -10,7 +10,8 @@ import type {
 } from "./sro-types";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = "google/gemini-2.0-flash-001";
+// google/gemini-2.0-flash-001 was retired on OpenRouter (404 "No endpoints found").
+const MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
 const MAX_USER_PROMPT_CHARS = 50_000;
 
 const SYSTEM_PROMPT = `You are an expert SRO (Selection Rate Optimization) analyst. SRO is the discipline of optimizing web content to be selected by AI systems as grounding sources when answering user queries.
@@ -70,7 +71,9 @@ function formatGrounding(grounding: GroundingResult | null): string {
   ];
 
   if (grounding.targetUrlChunkIndices.length > 0) {
-    lines.push(`Target position(s) in grounding: ${grounding.targetUrlChunkIndices.map(i => `#${i + 1}`).join(", ")}`);
+    lines.push(
+      `Target position(s) in grounding: ${grounding.targetUrlChunkIndices.map((i) => `#${i + 1}`).join(", ")}`,
+    );
   }
 
   if (grounding.targetSnippets.length > 0) {
@@ -86,9 +89,11 @@ function formatGrounding(grounding: GroundingResult | null): string {
       const chunk = grounding.chunks[i];
       const isTarget = grounding.targetUrlChunkIndices.includes(i);
       const chunkWords = grounding.supports
-        .filter(s => s.chunkIndices.includes(i))
+        .filter((s) => s.chunkIndices.includes(i))
         .reduce((sum, s) => sum + s.text.split(/\s+/).length, 0);
-      lines.push(`  #${i + 1}: ${chunk.title} (${chunkWords}w)${isTarget ? " [TARGET]" : ""}`);
+      lines.push(
+        `  #${i + 1}: ${chunk.title} (${chunkWords}w)${isTarget ? " [TARGET]" : ""}`,
+      );
     }
   }
 
@@ -104,7 +109,9 @@ function formatPlatforms(platforms: PlatformResult[]): string {
       continue;
     }
     const status = p.targetUrlCited ? "CITED" : "NOT CITED";
-    lines.push(`  ${p.label}: ${status} (${p.citations.length} total citations)`);
+    lines.push(
+      `  ${p.label}: ${status} (${p.citations.length} total citations)`,
+    );
     if (p.targetCitations.length > 0) {
       for (const c of p.targetCitations.slice(0, 3)) {
         if (c.citedSentence) {
@@ -113,8 +120,8 @@ function formatPlatforms(platforms: PlatformResult[]): string {
       }
     }
   }
-  const doneCount = platforms.filter(p => p.status === "done").length;
-  const citedCount = platforms.filter(p => p.targetUrlCited).length;
+  const doneCount = platforms.filter((p) => p.status === "done").length;
+  const citedCount = platforms.filter((p) => p.targetUrlCited).length;
   lines.push(`\nCited on ${citedCount}/${doneCount} platforms.`);
   return lines.join("\n");
 }
@@ -128,7 +135,9 @@ function formatSerp(serp: SerpResult | null): string {
   if (serp.organicResults.length > 0) {
     lines.push("Top organic results:");
     for (const r of serp.organicResults.slice(0, 10)) {
-      lines.push(`  #${r.position}: ${r.url} - "${truncate(r.title, 100)}"${r.isTarget ? " [TARGET]" : ""}`);
+      lines.push(
+        `  #${r.position}: ${r.url} - "${truncate(r.title, 100)}"${r.isTarget ? " [TARGET]" : ""}`,
+      );
     }
   }
   return lines.join("\n");
@@ -139,7 +148,8 @@ function formatPage(page: ScrapedPage | null, label: string): string {
   if (page.error) return `${label}: Error scraping - ${page.error}`;
   const lines = [`${label}: ${page.url}`];
   if (page.title) lines.push(`Title: ${page.title}`);
-  if (page.metaDescription) lines.push(`Meta description: ${page.metaDescription}`);
+  if (page.metaDescription)
+    lines.push(`Meta description: ${page.metaDescription}`);
   lines.push(`Word count: ${page.wordCount}`);
   if (page.headings.length > 0) {
     lines.push("Headings:");
@@ -226,7 +236,9 @@ function buildUserPrompt(input: LLMAnalysisInput): string {
 
   let prompt = sections.join("\n");
   if (prompt.length > MAX_USER_PROMPT_CHARS) {
-    prompt = prompt.slice(0, MAX_USER_PROMPT_CHARS) + "\n\n[Content truncated to fit context limits. Analyze what is available.]";
+    prompt =
+      prompt.slice(0, MAX_USER_PROMPT_CHARS) +
+      "\n\n[Content truncated to fit context limits. Analyze what is available.]";
   }
   return prompt;
 }
@@ -256,19 +268,28 @@ function defaultResult(error: string): LLMAnalysisResult {
 function parseResponse(raw: unknown): LLMAnalysisResult {
   const data = raw as Record<string, unknown>;
 
-  const overallScore = Math.max(0, Math.min(100, Number(data.overallScore) || 0));
-  const summary = typeof data.summary === "string" ? data.summary : "No summary provided.";
+  const overallScore = Math.max(
+    0,
+    Math.min(100, Number(data.overallScore) || 0),
+  );
+  const summary =
+    typeof data.summary === "string" ? data.summary : "No summary provided.";
 
   const recommendations: LLMRecommendation[] = [];
   if (Array.isArray(data.recommendations)) {
     for (const r of data.recommendations) {
       const rec = r as Record<string, unknown>;
-      const category = ["content", "structure", "technical", "strategy"].includes(
-        rec.category as string
-      )
+      const category = [
+        "content",
+        "structure",
+        "technical",
+        "strategy",
+      ].includes(rec.category as string)
         ? (rec.category as LLMRecommendation["category"])
         : "strategy";
-      const priority = ["high", "medium", "low"].includes(rec.priority as string)
+      const priority = ["high", "medium", "low"].includes(
+        rec.priority as string,
+      )
         ? (rec.priority as LLMRecommendation["priority"])
         : "medium";
       recommendations.push({
@@ -290,10 +311,18 @@ function parseResponse(raw: unknown): LLMAnalysisResult {
     ? data.competitorInsights.filter((i: unknown) => typeof i === "string")
     : [];
 
-  return { overallScore, summary, recommendations, contentGaps, competitorInsights };
+  return {
+    overallScore,
+    summary,
+    recommendations,
+    contentGaps,
+    competitorInsights,
+  };
 }
 
-export async function analyzeSRO(input: LLMAnalysisInput): Promise<LLMAnalysisResult> {
+export async function analyzeSRO(
+  input: LLMAnalysisInput,
+): Promise<LLMAnalysisResult> {
   const apiKey = process.env.OPENROUTER_KEY;
   if (!apiKey) {
     return defaultResult("OPENROUTER_KEY environment variable is not set.");
@@ -321,7 +350,9 @@ export async function analyzeSRO(input: LLMAnalysisInput): Promise<LLMAnalysisRe
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error");
-      return defaultResult(`OpenRouter API returned ${response.status}: ${errorText}`);
+      return defaultResult(
+        `OpenRouter API returned ${response.status}: ${errorText}`,
+      );
     }
 
     const json = await response.json();
