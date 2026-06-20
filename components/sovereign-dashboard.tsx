@@ -2189,7 +2189,7 @@ Now analyze all ${competitorList.length} competitors:`,
           {/* SRO Analysis stays mounted to preserve in-flight state */}
           <div className={activeTab === "SRO Analysis" ? "" : "hidden"}>
             <section className="rounded-xl border border-th-border bg-th-card p-5 shadow-sm">
-              <SROAnalysisTab />
+              <SROAnalysisTab demoMode={demoMode} />
             </section>
           </div>
           <section className="mt-3 rounded-lg border border-th-border bg-th-card px-4 py-3">

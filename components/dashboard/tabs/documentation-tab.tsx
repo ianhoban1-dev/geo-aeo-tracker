@@ -93,7 +93,7 @@ const sections: DocSection[] = [
     icon: "🔗",
     content: [
       "Analyze which URLs and domains AI models cite most frequently in their responses.",
-      "View a bar chart of top cited domains, search by URL or domain, sort by citations/pages/prompts/alphabetical.",
+      "Browse a ranked table of top cited domains, search by URL or domain, sort by citations/pages/prompts/alphabetical.",
       "Toggle between domain-level and URL-level views.",
       "Filter by minimum citation count and export the full table as CSV.",
       "Your own website is badged with a 'Your site' indicator so you can quickly see if your domain is being cited.",
@@ -245,7 +245,9 @@ export function DocumentationTab() {
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(search.toLowerCase()) ||
-          s.content.some((line) => line.toLowerCase().includes(search.toLowerCase())),
+          s.content.some((line) =>
+            line.toLowerCase().includes(search.toLowerCase()),
+          ),
       )
     : sections;
 
@@ -291,20 +293,28 @@ export function DocumentationTab() {
           <div>
             <div className="mb-4 flex items-center gap-3">
               <span className="text-2xl">{current.icon}</span>
-              <h2 className="text-lg font-semibold text-th-text">{current.title}</h2>
+              <h2 className="text-lg font-semibold text-th-text">
+                {current.title}
+              </h2>
             </div>
             <div className="space-y-3">
               {current.content.map((line, i) => {
                 if (line.startsWith("• ")) {
                   return (
-                    <div key={i} className="ml-4 flex items-start gap-2 text-sm text-th-text-secondary leading-relaxed">
+                    <div
+                      key={i}
+                      className="ml-4 flex items-start gap-2 text-sm text-th-text-secondary leading-relaxed"
+                    >
                       <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-th-accent" />
                       <span>{line.slice(2)}</span>
                     </div>
                   );
                 }
                 return (
-                  <p key={i} className="text-sm leading-relaxed text-th-text-secondary">
+                  <p
+                    key={i}
+                    className="text-sm leading-relaxed text-th-text-secondary"
+                  >
                     {line}
                   </p>
                 );
@@ -313,7 +323,9 @@ export function DocumentationTab() {
           </div>
         ) : (
           <div className="py-8 text-center text-sm text-th-text-muted">
-            {search ? `No documentation matches "${search}".` : "Select a section from the sidebar."}
+            {search
+              ? `No documentation matches "${search}".`
+              : "Select a section from the sidebar."}
           </div>
         )}
 

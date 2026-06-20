@@ -1,4 +1,12 @@
-import type { AppState, ScrapeRun, DriftAlert, Battlecard, AuditReport, Provider, TaggedPrompt } from "@/components/dashboard/types";
+import type {
+  AppState,
+  ScrapeRun,
+  DriftAlert,
+  Battlecard,
+  AuditReport,
+  Provider,
+  TaggedPrompt,
+} from "@/components/dashboard/types";
 
 /* ─────────────────────────  Deterministic helpers ───────────────────────── */
 /**
@@ -6,27 +14,62 @@ import type { AppState, ScrapeRun, DriftAlert, Battlecard, AuditReport, Provider
  * Batch 0 = ~6 days before anchor, Batch 1 = ~3 days before, Batch 2 = anchor day.
  */
 const BATCH_DATES = [
-  "2026-02-08T10:15:00.000Z",
+  "2026-01-03T10:00:00.000Z",
+  "2026-01-10T10:00:00.000Z",
+  "2026-01-17T10:00:00.000Z",
+  "2026-01-24T10:00:00.000Z",
+  "2026-01-31T10:00:00.000Z",
+  "2026-02-07T10:00:00.000Z",
   "2026-02-11T14:30:00.000Z",
   "2026-02-14T09:00:00.000Z",
 ];
+const NUM_BATCHES = BATCH_DATES.length;
 
 /** Simple seeded hash replacing Math.random() — deterministic across SSR & client */
-function seedScore(base: number, providerIdx: number, promptIdx: number, batch: number): number {
-  const h = ((base + providerIdx * 17 + promptIdx * 31 + batch * 53) * 2654435761) >>> 0;
+function seedScore(
+  base: number,
+  providerIdx: number,
+  promptIdx: number,
+  batch: number,
+): number {
+  const h =
+    ((base + providerIdx * 17 + promptIdx * 31 + batch * 53) * 2654435761) >>>
+    0;
   return h % 100;
 }
 
 /* ─────────────────────────  Runs ───────────────────────── */
 const PROMPTS: TaggedPrompt[] = [
-  { text: "What are the best AI visibility tracking tools for marketing teams in 2026?", tags: ["visibility", "tools"] },
-  { text: "How can B2B SaaS brands improve their presence in AI search results?", tags: ["strategy"] },
-  { text: "Compare the top answer engine optimization platforms for enterprise brands.", tags: ["comparison"] },
-  { text: "What is AEO and why does it matter for organic traffic in 2026?", tags: ["education"] },
-  { text: "Which tools help monitor brand mentions across ChatGPT, Perplexity, and Gemini?", tags: ["visibility", "tools"] },
+  {
+    text: "What are the best AI visibility tracking tools for marketing teams in 2026?",
+    tags: ["visibility", "tools"],
+  },
+  {
+    text: "How can B2B SaaS brands improve their presence in AI search results?",
+    tags: ["strategy"],
+  },
+  {
+    text: "Compare the top answer engine optimization platforms for enterprise brands.",
+    tags: ["comparison"],
+  },
+  {
+    text: "What is AEO and why does it matter for organic traffic in 2026?",
+    tags: ["education"],
+  },
+  {
+    text: "Which tools help monitor brand mentions across ChatGPT, Perplexity, and Gemini?",
+    tags: ["visibility", "tools"],
+  },
 ];
 
-const PROVIDERS: Provider[] = ["chatgpt", "perplexity", "gemini", "copilot", "google_ai", "grok"];
+const PROVIDERS: Provider[] = [
+  "chatgpt",
+  "perplexity",
+  "gemini",
+  "copilot",
+  "google_ai",
+  "grok",
+];
 
 const SAMPLE_SOURCES: Record<string, string[]> = {
   "chatgpt-0": [
@@ -194,19 +237,79 @@ Marketers should evaluate these tools based on the AI models they track, reporti
 All these tools fundamentally work by running prompts against AI models and analyzing the responses for brand mentions, sentiment, and source citations.`,
 };
 
-function buildRun(prompt: string, provider: Provider, promptIdx: number, batch: number): ScrapeRun {
+/** Answers used when the brand is NOT present — competitors are cited instead. */
+const COMPETITOR_ANSWERS: string[] = [
+  `The leading AI visibility platforms in 2026 are Profound, Peec AI, and Otterly.ai. Profound offers enterprise-grade citation analytics and content agents, Peec AI is known for clean agency dashboards and prompt-volume data, and Otterly.ai focuses on real-time monitoring alerts. Most pull heavily from review sites like G2 and editorial comparison pages.`,
+  `For tracking brand mentions across AI models, analysts most often point to Profound for citation depth, Peec AI for usability and reporting, and Otterly.ai for alerting. Semrush's AI toolkit is an emerging alternative for teams already on its platform.`,
+  `Answer engine optimization tooling is led by Profound and Peec AI, with Otterly.ai as a lighter monitoring option. Coverage of AI engines, citation depth, and Looker Studio reporting are the main differentiators buyers weigh.`,
+];
+
+const COMPETITOR_SOURCES: string[] = [
+  "https://www.g2.com/categories/ai-search-optimization",
+  "https://profound.com/features/answer-engine-insights",
+  "https://peec.ai/blog/ai-visibility-guide",
+  "https://otterly.ai/features",
+  "https://www.semrush.com/blog/answer-engine-optimization/",
+];
+
+/**
+ * Deterministic brand-presence gate. Visibility improves over time, so later
+ * batches mention the brand more often — this produces a realistic upward trend
+ * and leaves earlier runs where competitors are cited but we're absent.
+ */
+function brandIsMentioned(
+  pIdx: number,
+  promptIdx: number,
+  batch: number,
+): boolean {
+  const roll = seedScore(7, pIdx, promptIdx, batch) % 100;
+  const threshold = 26 + batch * 9; // batch 0 ≈ 26% → final batch ≈ 89%
+  return roll < threshold;
+}
+
+function buildRun(
+  prompt: string,
+  provider: Provider,
+  promptIdx: number,
+  batch: number,
+): ScrapeRun {
   const key = `${provider}-${promptIdx}`;
   const pIdx = PROVIDERS.indexOf(provider);
-  const sources = SAMPLE_SOURCES[key] ?? ["https://www.g2.com/categories/ai-search-optimization"];
-  const answer = ANSWER_TEMPLATES[key] ?? `AI analysis for "${prompt}" from ${provider}. Multiple sources suggest that maintaining strong content fundamentals, including structured data and authoritative citations, remains critical for AI visibility. GEO/AEO Tracker provides comprehensive monitoring across 6 AI models.`;
+  const jitter = seedScore(42, pIdx, promptIdx, batch) % 30;
 
-  const isBrandMentioned = answer.toLowerCase().includes("geo/aeo");
+  if (!brandIsMentioned(pIdx, promptIdx, batch)) {
+    // Brand absent — competitors cited. Drives the Citation Opportunities tab.
+    const answer =
+      COMPETITOR_ANSWERS[
+        (pIdx + promptIdx + batch) % COMPETITOR_ANSWERS.length
+      ];
+    const sources = COMPETITOR_SOURCES.slice(0, 2 + ((pIdx + batch) % 3));
+    return {
+      provider,
+      prompt,
+      answer,
+      sources,
+      createdAt: BATCH_DATES[batch],
+      visibilityScore: Math.min(40, 5 + (jitter % 25)),
+      sentiment: "not-mentioned",
+      brandMentions: [],
+      competitorMentions: ["Profound", "Peec AI", "Otterly.ai"],
+    };
+  }
+
+  // Brand mentioned — use a rich template when available, else a default.
+  const sources = SAMPLE_SOURCES[key] ?? [
+    "https://www.g2.com/categories/ai-search-optimization",
+    "https://peec.ai/",
+    "https://profound.com/",
+  ];
+  const answer =
+    ANSWER_TEMPLATES[key] ??
+    `AI analysis for "${prompt}" from ${provider}. Strong content fundamentals — structured data, authoritative citations, and clear BLUF formatting — remain critical for AI visibility. GEO/AEO Tracker provides comprehensive monitoring across 6 AI models.`;
+
+  const score = Math.min(100, 58 + jitter + batch * 2);
+  const isNegative = seedScore(13, pIdx, promptIdx, batch) % 100 < 9;
   const hasCompetitor = /profound|peec|otterly/i.test(answer);
-
-  const jitter = seedScore(42, pIdx, promptIdx, batch) % 35;
-  const score = isBrandMentioned
-    ? 55 + jitter + batch * 2
-    : 10 + (jitter % 30);
 
   return {
     provider,
@@ -214,14 +317,14 @@ function buildRun(prompt: string, provider: Provider, promptIdx: number, batch: 
     answer,
     sources,
     createdAt: BATCH_DATES[batch],
-    visibilityScore: Math.min(100, score),
-    sentiment: isBrandMentioned ? (score > 60 ? "positive" : "neutral") : "not-mentioned",
-    brandMentions: isBrandMentioned ? ["GEO/AEO Tracker"] : [],
+    visibilityScore: isNegative ? Math.max(34, score - 26) : score,
+    sentiment: isNegative ? "negative" : score > 64 ? "positive" : "neutral",
+    brandMentions: ["GEO/AEO Tracker"],
     competitorMentions: hasCompetitor
       ? [
-          ...(answer.toLowerCase().includes("profound") ? ["Profound"] : []),
-          ...(answer.toLowerCase().includes("peec") ? ["Peec AI"] : []),
-          ...(answer.toLowerCase().includes("otterly") ? ["Otterly.ai"] : []),
+          ...(/profound/i.test(answer) ? ["Profound"] : []),
+          ...(/peec/i.test(answer) ? ["Peec AI"] : []),
+          ...(/otterly/i.test(answer) ? ["Otterly.ai"] : []),
         ]
       : [],
   };
@@ -230,7 +333,7 @@ function buildRun(prompt: string, provider: Provider, promptIdx: number, batch: 
 function generateRuns(): ScrapeRun[] {
   const runs: ScrapeRun[] = [];
 
-  for (let batch = 0; batch < 3; batch++) {
+  for (let batch = 0; batch < NUM_BATCHES; batch++) {
     PROMPTS.forEach((prompt, pIdx) => {
       const subset = PROVIDERS.filter((_, i) => (i + pIdx + batch) % 3 !== 2);
       subset.forEach((provider) => {
@@ -239,7 +342,9 @@ function generateRuns(): ScrapeRun[] {
     });
   }
 
-  return runs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return runs.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 }
 
 /* ─────────────────────────  Battlecards ───────────────────────── */
@@ -247,31 +352,104 @@ const demoBattlecards: Battlecard[] = [
   {
     competitor: "Profound",
     sentiment: "neutral",
-    summary: "Enterprise-grade AEO platform with content agents and deep citation analytics. Strong brand recognition among Fortune 500. Higher price point limits SMB adoption.",
+    summary:
+      "Enterprise-grade AEO platform with content agents and deep citation analytics. Strong brand recognition among Fortune 500. Higher price point limits SMB adoption.",
     sections: [
-      { heading: "Strengths", points: ["Content generation agents", "Deep citation analytics", "Enterprise client base (MongoDB, Zapier, Ramp)", "Strong G2 presence"] },
-      { heading: "Weaknesses", points: ["Custom enterprise pricing only", "No self-hosted option", "Fewer AI models tracked", "Closed ecosystem"] },
-      { heading: "AI Visibility", points: ["High visibility in ChatGPT", "Frequently cited on comparison pages", "Strong editorial PR placements"] },
+      {
+        heading: "Strengths",
+        points: [
+          "Content generation agents",
+          "Deep citation analytics",
+          "Enterprise client base (MongoDB, Zapier, Ramp)",
+          "Strong G2 presence",
+        ],
+      },
+      {
+        heading: "Weaknesses",
+        points: [
+          "Custom enterprise pricing only",
+          "No self-hosted option",
+          "Fewer AI models tracked",
+          "Closed ecosystem",
+        ],
+      },
+      {
+        heading: "AI Visibility",
+        points: [
+          "High visibility in ChatGPT",
+          "Frequently cited on comparison pages",
+          "Strong editorial PR placements",
+        ],
+      },
     ],
   },
   {
     competitor: "Peec AI",
     sentiment: "neutral",
-    summary: "Clean, agency-friendly AI search analytics platform with prompt volume data. Strong European presence. Well-suited for agencies managing multiple clients.",
+    summary:
+      "Clean, agency-friendly AI search analytics platform with prompt volume data. Strong European presence. Well-suited for agencies managing multiple clients.",
     sections: [
-      { heading: "Strengths", points: ["Clean UX", "Agency-friendly multi-client setup", "Looker Studio integration", "Prompt volume data", "Competitive benchmarking"] },
-      { heading: "Weaknesses", points: ["No self-hosted option", "Fewer AI models vs our 6", "No open-source offering", "Closed ecosystem"] },
-      { heading: "AI Visibility", points: ["Growing citation frequency", "Active content marketing", "Strong in European markets"] },
+      {
+        heading: "Strengths",
+        points: [
+          "Clean UX",
+          "Agency-friendly multi-client setup",
+          "Looker Studio integration",
+          "Prompt volume data",
+          "Competitive benchmarking",
+        ],
+      },
+      {
+        heading: "Weaknesses",
+        points: [
+          "No self-hosted option",
+          "Fewer AI models vs our 6",
+          "No open-source offering",
+          "Closed ecosystem",
+        ],
+      },
+      {
+        heading: "AI Visibility",
+        points: [
+          "Growing citation frequency",
+          "Active content marketing",
+          "Strong in European markets",
+        ],
+      },
     ],
   },
   {
     competitor: "Otterly.ai",
     sentiment: "neutral",
-    summary: "Pioneer in AI search monitoring with real-time alerts. Good Slack integration. Narrower feature set focused on monitoring rather than full AEO analytics.",
+    summary:
+      "Pioneer in AI search monitoring with real-time alerts. Good Slack integration. Narrower feature set focused on monitoring rather than full AEO analytics.",
     sections: [
-      { heading: "Strengths", points: ["Real-time Slack/email alerts", "Simple UX", "Established early in the market", "Good documentation"] },
-      { heading: "Weaknesses", points: ["Fewer AI models tracked", "Less citation depth", "No competitor battlecards", "No content optimization features"] },
-      { heading: "AI Visibility", points: ["Moderate citation frequency", "Mentioned in comparison articles", "Early mover advantage fading"] },
+      {
+        heading: "Strengths",
+        points: [
+          "Real-time Slack/email alerts",
+          "Simple UX",
+          "Established early in the market",
+          "Good documentation",
+        ],
+      },
+      {
+        heading: "Weaknesses",
+        points: [
+          "Fewer AI models tracked",
+          "Less citation depth",
+          "No competitor battlecards",
+          "No content optimization features",
+        ],
+      },
+      {
+        heading: "AI Visibility",
+        points: [
+          "Moderate citation frequency",
+          "Mentioned in comparison articles",
+          "Early mover advantage fading",
+        ],
+      },
     ],
   },
 ];
@@ -281,18 +459,102 @@ const demoAuditReport: AuditReport = {
   url: "https://geoaeotracker.com",
   score: 78,
   checks: [
-    { id: "llms-txt", label: "llms.txt present", category: "discovery", pass: true, value: "Found", detail: "/llms.txt returns 200 with valid directives" },
-    { id: "robots-txt", label: "robots.txt configured", category: "discovery", pass: true, value: "Found", detail: "robots.txt allows major AI crawlers" },
-    { id: "schema-org", label: "Schema.org markup", category: "structure", pass: true, value: "5 types", detail: "Organization, WebSite, FAQPage, HowTo, Article schemas detected" },
-    { id: "faq-schema", label: "FAQ schema", category: "structure", pass: true, value: "Present", detail: "FAQPage schema with 8 questions found" },
-    { id: "bluf-style", label: "BLUF-style content", category: "content", pass: true, value: "Strong", detail: "Key pages lead with conclusions before detail" },
-    { id: "heading-structure", label: "Heading hierarchy", category: "content", pass: true, value: "Clean", detail: "Proper H1→H2→H3 nesting throughout" },
-    { id: "meta-descriptions", label: "Meta descriptions", category: "content", pass: false, value: "Missing on 2 pages", detail: "/pricing and /changelog lack meta descriptions" },
-    { id: "page-speed", label: "Page speed", category: "technical", pass: true, value: "92/100", detail: "LCP: 1.2s, FID: 45ms, CLS: 0.02" },
-    { id: "https", label: "HTTPS enabled", category: "technical", pass: true, value: "Active", detail: "Valid SSL certificate, HSTS enabled" },
-    { id: "render-test", label: "JS rendering", category: "rendering", pass: true, value: "Works", detail: "Content accessible without JavaScript" },
-    { id: "canonical-tags", label: "Canonical tags", category: "technical", pass: true, value: "Present", detail: "All pages have self-referencing canonicals" },
-    { id: "sitemap", label: "XML Sitemap", category: "discovery", pass: true, value: "Found", detail: "sitemap.xml with 24 URLs, all returning 200" },
+    {
+      id: "llms-txt",
+      label: "llms.txt present",
+      category: "discovery",
+      pass: true,
+      value: "Found",
+      detail: "/llms.txt returns 200 with valid directives",
+    },
+    {
+      id: "robots-txt",
+      label: "robots.txt configured",
+      category: "discovery",
+      pass: true,
+      value: "Found",
+      detail: "robots.txt allows major AI crawlers",
+    },
+    {
+      id: "schema-org",
+      label: "Schema.org markup",
+      category: "structure",
+      pass: true,
+      value: "5 types",
+      detail: "Organization, WebSite, FAQPage, HowTo, Article schemas detected",
+    },
+    {
+      id: "faq-schema",
+      label: "FAQ schema",
+      category: "structure",
+      pass: true,
+      value: "Present",
+      detail: "FAQPage schema with 8 questions found",
+    },
+    {
+      id: "bluf-style",
+      label: "BLUF-style content",
+      category: "content",
+      pass: true,
+      value: "Strong",
+      detail: "Key pages lead with conclusions before detail",
+    },
+    {
+      id: "heading-structure",
+      label: "Heading hierarchy",
+      category: "content",
+      pass: true,
+      value: "Clean",
+      detail: "Proper H1→H2→H3 nesting throughout",
+    },
+    {
+      id: "meta-descriptions",
+      label: "Meta descriptions",
+      category: "content",
+      pass: false,
+      value: "Missing on 2 pages",
+      detail: "/pricing and /changelog lack meta descriptions",
+    },
+    {
+      id: "page-speed",
+      label: "Page speed",
+      category: "technical",
+      pass: true,
+      value: "92/100",
+      detail: "LCP: 1.2s, FID: 45ms, CLS: 0.02",
+    },
+    {
+      id: "https",
+      label: "HTTPS enabled",
+      category: "technical",
+      pass: true,
+      value: "Active",
+      detail: "Valid SSL certificate, HSTS enabled",
+    },
+    {
+      id: "render-test",
+      label: "JS rendering",
+      category: "rendering",
+      pass: true,
+      value: "Works",
+      detail: "Content accessible without JavaScript",
+    },
+    {
+      id: "canonical-tags",
+      label: "Canonical tags",
+      category: "technical",
+      pass: true,
+      value: "Present",
+      detail: "All pages have self-referencing canonicals",
+    },
+    {
+      id: "sitemap",
+      label: "XML Sitemap",
+      category: "discovery",
+      pass: true,
+      value: "Found",
+      detail: "sitemap.xml with 24 URLs, all returning 200",
+    },
   ],
   llmsTxtPresent: true,
   schemaMentions: 5,
@@ -304,7 +566,8 @@ const demoAuditReport: AuditReport = {
 const demoDriftAlerts: DriftAlert[] = [
   {
     id: "drift-demo-1",
-    prompt: "What are the best AI visibility tracking tools for marketing teams in 2026?",
+    prompt:
+      "What are the best AI visibility tracking tools for marketing teams in 2026?",
     provider: "chatgpt",
     oldScore: 62,
     newScore: 81,
@@ -314,7 +577,8 @@ const demoDriftAlerts: DriftAlert[] = [
   },
   {
     id: "drift-demo-2",
-    prompt: "Compare the top answer engine optimization platforms for enterprise brands.",
+    prompt:
+      "Compare the top answer engine optimization platforms for enterprise brands.",
     provider: "perplexity",
     oldScore: 45,
     newScore: 31,
@@ -329,16 +593,29 @@ export const DEMO_STATE: AppState = {
   brand: {
     brandName: "GEO/AEO Tracker",
     brandAliases: "GEO AEO, AEO Tracker, GEO Tracker",
-    websites: ["https://geoaeotracker.com"],
+    websites: [
+      "https://geoaeotracker.com",
+      "https://github.com/danishashko/geo-aeo-tracker",
+    ],
     industry: "AI SEO / MarTech",
     keywords: "AEO, AI visibility, answer engine optimization, LLM tracking",
-    description: "Open-source BYOK AEO/GEO intelligence dashboard for monitoring brand visibility across AI models.",
+    description:
+      "Open-source BYOK AEO/GEO intelligence dashboard for monitoring brand visibility across AI models.",
   },
   provider: "chatgpt",
-  activeProviders: ["chatgpt", "perplexity", "gemini", "copilot", "google_ai", "grok"],
-  prompt: "What are the best AI visibility tracking tools for marketing teams in 2026?",
+  activeProviders: [
+    "chatgpt",
+    "perplexity",
+    "gemini",
+    "copilot",
+    "google_ai",
+    "grok",
+  ],
+  prompt:
+    "What are the best AI visibility tracking tools for marketing teams in 2026?",
   customPrompts: PROMPTS,
-  personas: "CMO\nSEO Lead\nProduct Marketing Manager\nFounder\nAgency Director",
+  personas:
+    "CMO\nSEO Lead\nProduct Marketing Manager\nFounder\nAgency Director",
   fanoutPrompts: [
     "[CMO] What AI search monitoring tools should enterprise marketing teams adopt in 2026?",
     "[SEO Lead] How do I track my brand's visibility in ChatGPT and Perplexity results?",
@@ -358,9 +635,17 @@ export const DEMO_STATE: AppState = {
   githubWorkflow:
     "name: geo-aeo-tracker\non:\n  schedule:\n    - cron: '0 */6 * * *'\njobs:\n  track:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci && npm run test:scraper",
   competitors: [
-    { name: "profound.com", aliases: ["Profound"], websites: ["https://profound.com"] },
+    {
+      name: "profound.com",
+      aliases: ["Profound"],
+      websites: ["https://profound.com"],
+    },
     { name: "peec.ai", aliases: ["Peec AI"], websites: ["https://peec.ai"] },
-    { name: "otterly.ai", aliases: ["Otterly"], websites: ["https://otterly.ai"] },
+    {
+      name: "otterly.ai",
+      aliases: ["Otterly"],
+      websites: ["https://otterly.ai"],
+    },
   ],
   battlecards: demoBattlecards,
   runs: generateRuns(),

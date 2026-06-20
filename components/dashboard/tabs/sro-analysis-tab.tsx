@@ -4,6 +4,8 @@ import { useState, useCallback } from "react";
 import type {
   GroundingResult,
   PlatformResult,
+  PlatformCitation,
+  SROPlatform,
   SerpResult,
   ScrapedPage,
   SiteContext,
@@ -48,6 +50,274 @@ const INITIAL: SROState = {
   competitorPages: [],
   siteContext: null,
   llmAnalysis: null,
+};
+
+/* ── Demo seed: a completed analysis so the demo isn't an empty form ── */
+const DEMO_CITE_DOMAINS = [
+  "g2.com",
+  "profound.com",
+  "peec.ai",
+  "otterly.ai",
+  "semrush.com",
+  "searchenginejournal.com",
+];
+
+function demoCitation(domain: string, isTarget: boolean): PlatformCitation {
+  return {
+    url: isTarget
+      ? "https://geoaeotracker.com/vs/profound"
+      : `https://${domain}/`,
+    domain: isTarget ? "geoaeotracker.com" : domain,
+    title: isTarget
+      ? "GEO/AEO Tracker vs Profound"
+      : `${domain} — AI visibility`,
+    description: "",
+    hasTextFragment: false,
+    citedSentence: "",
+  };
+}
+
+function demoPlatform(
+  platform: SROPlatform,
+  label: string,
+  targetCited: boolean,
+  citationCount: number,
+): PlatformResult {
+  const citations: PlatformCitation[] = Array.from(
+    { length: citationCount },
+    (_, i) =>
+      demoCitation(
+        DEMO_CITE_DOMAINS[i % DEMO_CITE_DOMAINS.length],
+        targetCited && i === 0,
+      ),
+  );
+  return {
+    platform,
+    label,
+    status: "done",
+    answer: "",
+    citations,
+    targetUrlCited: targetCited,
+    targetCitations: targetCited ? [citations[0]] : [],
+  };
+}
+
+const DEMO_SRO_RESULT: SROState = {
+  targetUrl: "https://geoaeotracker.com/vs/profound",
+  keyword: "best ai visibility tracker",
+  stage: "done",
+  error: null,
+  grounding: {
+    query: "best ai visibility tracker",
+    answer:
+      "The best AI visibility trackers in 2026 include Profound, Peec AI, Otterly.ai, and the open-source GEO/AEO Tracker, which monitors brand visibility across six AI models with a bring-your-own-keys, local-first architecture.",
+    searchQueries: [
+      "best ai visibility tracker",
+      "ai visibility tracking tools 2026",
+      "open source aeo tracker",
+    ],
+    chunks: [
+      {
+        uri: "https://www.g2.com/categories/ai-search-optimization",
+        title: "g2.com",
+      },
+      {
+        uri: "https://profound.com/features/answer-engine-insights",
+        title: "profound.com",
+      },
+      {
+        uri: "https://geoaeotracker.com/vs/profound",
+        title: "geoaeotracker.com",
+      },
+      { uri: "https://peec.ai/blog/ai-visibility-guide", title: "peec.ai" },
+      { uri: "https://otterly.ai/features", title: "otterly.ai" },
+      {
+        uri: "https://www.searchenginejournal.com/aeo-tools/524301/",
+        title: "searchenginejournal.com",
+      },
+    ],
+    supports: [],
+    targetUrlFound: true,
+    targetUrlChunkIndices: [2],
+    targetSnippets: [
+      "GEO/AEO Tracker is an open-source, bring-your-own-keys dashboard that monitors brand visibility across six AI models including ChatGPT, Perplexity, and Gemini.",
+    ],
+    totalGroundingWords: 540,
+    targetGroundingWords: 86,
+    selectionRate: 0.159,
+  },
+  platforms: [
+    demoPlatform("chatgpt", "ChatGPT", true, 5),
+    demoPlatform("perplexity", "Perplexity", true, 4),
+    demoPlatform("gemini", "Gemini", false, 3),
+    demoPlatform("copilot", "Copilot", true, 3),
+    demoPlatform("ai_mode", "Google AI Mode", false, 6),
+    demoPlatform("grok", "Grok", false, 2),
+  ],
+  serp: {
+    keyword: "best ai visibility tracker",
+    totalResults: 9,
+    targetRank: 4,
+    topCompetitors: [
+      "https://www.g2.com/categories/ai-search-optimization",
+      "https://profound.com/",
+      "https://peec.ai/",
+    ],
+    organicResults: [
+      {
+        position: 1,
+        url: "https://www.g2.com/categories/ai-search-optimization",
+        domain: "g2.com",
+        title: "Best AI Search Optimization Software 2026 | G2",
+        description: "",
+        isTarget: false,
+      },
+      {
+        position: 2,
+        url: "https://profound.com/",
+        domain: "profound.com",
+        title: "Profound — Answer Engine Insights",
+        description: "",
+        isTarget: false,
+      },
+      {
+        position: 3,
+        url: "https://peec.ai/",
+        domain: "peec.ai",
+        title: "Peec AI — AI Search Analytics",
+        description: "",
+        isTarget: false,
+      },
+      {
+        position: 4,
+        url: "https://geoaeotracker.com/vs/profound",
+        domain: "geoaeotracker.com",
+        title: "GEO/AEO Tracker vs Profound — Open-Source AI Visibility",
+        description: "",
+        isTarget: true,
+      },
+      {
+        position: 5,
+        url: "https://otterly.ai/features",
+        domain: "otterly.ai",
+        title: "Otterly.ai — AI Search Monitoring",
+        description: "",
+        isTarget: false,
+      },
+      {
+        position: 6,
+        url: "https://www.searchenginejournal.com/aeo-tools/524301/",
+        domain: "searchenginejournal.com",
+        title: "12 Best AEO Tools Compared",
+        description: "",
+        isTarget: false,
+      },
+      {
+        position: 7,
+        url: "https://ziptie.dev/blog/aeo-tools-compared/",
+        domain: "ziptie.dev",
+        title: "AEO Tools Compared (2026)",
+        description: "",
+        isTarget: false,
+      },
+    ],
+  },
+  targetPage: {
+    url: "https://geoaeotracker.com/vs/profound",
+    domain: "geoaeotracker.com",
+    title: "GEO/AEO Tracker vs Profound — Open-Source AI Visibility Tracking",
+    headings: [
+      "GEO/AEO Tracker vs Profound",
+      "Model coverage",
+      "Pricing",
+      "Data ownership",
+      "FAQ",
+    ],
+    wordCount: 1240,
+    contentSnippet:
+      "GEO/AEO Tracker is a free, open-source alternative to Profound that tracks brand visibility across six AI models with a bring-your-own-keys, local-first design.",
+    fullText: "",
+    metaDescription:
+      "Compare GEO/AEO Tracker and Profound for AI visibility tracking: model coverage, pricing, and data ownership.",
+  },
+  competitorPages: [],
+  siteContext: {
+    domain: "geoaeotracker.com",
+    homepageUrl: "https://geoaeotracker.com",
+    primaryTopics: [
+      "AI visibility tracking",
+      "Answer engine optimization",
+      "Multi-model monitoring",
+    ],
+    industry: "AI SEO / MarTech",
+    targetAudience: "B2B SaaS marketing teams and SEO leads",
+    contentThemes: ["GEO", "AEO", "LLM citations", "competitor benchmarking"],
+    siteDescription:
+      "Open-source, BYOK dashboard for tracking brand visibility across AI models.",
+  },
+  llmAnalysis: {
+    overallScore: 72,
+    summary:
+      "Your comparison page is cited by ChatGPT, Perplexity, and Copilot for this query and ranks #4 organically, but Gemini and Google AI Mode aren't picking it up. Selection rate is moderate (15.9%) — the page is referenced but isn't the dominant source. Tightening the answer-first framing and adding a structured comparison table should lift Gemini and AI-Mode pickup.",
+    recommendations: [
+      {
+        category: "content",
+        priority: "high",
+        title: "Lead with a direct, extractable answer",
+        description:
+          "Gemini and AI Mode favor pages that state the answer in the first one or two sentences. Open with a one-line verdict before the comparison.",
+        actionItems: [
+          "Add a BLUF summary box at the very top",
+          "State the recommended pick in the first sentence",
+          "Mirror the exact query phrasing in an H2",
+        ],
+      },
+      {
+        category: "structure",
+        priority: "high",
+        title: "Add a structured comparison table with schema",
+        description:
+          "A machine-readable feature table improves citation odds on Google surfaces.",
+        actionItems: [
+          "Add an HTML table comparing the 6 models",
+          "Mark up the page with Product + FAQPage JSON-LD",
+          "Use row labels matching common sub-questions",
+        ],
+      },
+      {
+        category: "strategy",
+        priority: "medium",
+        title: "Earn citations on G2 and comparison hubs",
+        description:
+          "AI engines repeatedly source G2 for this category, so a presence there compounds.",
+        actionItems: [
+          "Claim and optimize the G2 listing",
+          "Pitch an entry on ziptie.dev and SEJ roundups",
+        ],
+      },
+      {
+        category: "technical",
+        priority: "low",
+        title: "Add a text-fragment-friendly FAQ",
+        description:
+          "Self-contained Q&A blocks are the snippets engines quote verbatim.",
+        actionItems: [
+          "Add 5–7 FAQ entries answering the sub-questions",
+          "Keep each answer under 60 words",
+        ],
+      },
+    ],
+    contentGaps: [
+      "No structured model-by-model comparison table",
+      "Missing FAQ schema for 'which AI visibility tracker is best' sub-questions",
+      "No explicit pricing comparison vs Profound on the page",
+    ],
+    competitorInsights: [
+      "Profound is cited on 5/6 platforms for this query, mostly via its Answer Engine Insights page",
+      "Peec AI wins Gemini citations through its long-form 'AI visibility guide' blog",
+      "G2's category page is the single most-cited source — table-stakes to appear there",
+    ],
+  },
 };
 
 const STAGE_LABELS: Record<AnalysisStage, string> = {
@@ -186,8 +456,10 @@ function ProgressBar({ stage }: { stage: AnalysisStage }) {
 
 // ── Main Component ────────────────────────────────────────
 
-export function SROAnalysisTab() {
-  const [s, setS] = useState<SROState>(INITIAL);
+export function SROAnalysisTab({
+  demoMode = false,
+}: { demoMode?: boolean } = {}) {
+  const [s, setS] = useState<SROState>(demoMode ? DEMO_SRO_RESULT : INITIAL);
 
   const isRunning = !["idle", "done", "error"].includes(s.stage);
 
